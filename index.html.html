@@ -1,0 +1,1419 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Konstelacje Lektur</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f2; color: #1a1a1a; min-height: 100vh; }
+  #root { min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+  #app { width: 100%; max-width: 480px; height: 100vh; display: flex; flex-direction: column; background: #f5f5f2; overflow: hidden; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  input { font-family: inherit; }
+  * { -webkit-tap-highlight-color: transparent; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .slide-in { animation: slideIn 0.25s ease; }
+</style>
+</head>
+<body>
+<div id="root"><div id="app"></div></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+// ═══════════════════════════════════════════════════════════
+// SEED DATA — wygenerowany z macierz_claude_game_compact.json
+// ═══════════════════════════════════════════════════════════
+
+const LEKTURY_DATA = {
+  "biblia_ksiega_rodzaju": {title:"Biblia \u2013 Ksi\u0119ga Rodzaju", stage:"LO", g:["bog","dobro_i_z_o","ogrod","raj","rodzina_relacje_rodzinne"], p:["dziecko","dom","matka","ojciec","podroz_tu_aczka_wedrowka_pielgrzymka","praca","wina_i_kara","wrog_zaborca"]},
+  "biblia_ksiega_hioba": {title:"Biblia \u2013 Ksi\u0119ga Hioba", stage:"LO", g:["bog","cierpienie","cierpienie_niezawinione","los_przeznaczenie","strata"], p:["niesta_osc_swiata","pamiec_wspomnienia","samotnosc","sprawiedliwosc","smierc","wina_i_kara"]},
+  "biblia_ksiega_koheleta": {title:"Biblia \u2013 Ksi\u0119ga Koheleta", stage:"LO", g:["bog","niesta_osc_swiata","przemijanie"], p:["los_przeznaczenie","pieniadze_majatek","praca","starosc","szczescie","smierc"]},
+  "biblia_ksiega_psalmow": {title:"Biblia \u2013 Ksi\u0119ga Psalm\u00f3w", stage:"LO", g:["bog"], p:["cierpienie","ojczyzna_patriotyzm","wspolnota","sprawiedliwosc","wina_i_kara","wojna"]},
+  "biblia_apokalipsa_sw_jana": {title:"Biblia \u2013 Apokalipsa \u015bw. Jana", stage:"LO", g:["apokalipsa","bog","dobro_i_z_o","proroctwo_widzenie","smierc","zaswiaty"], p:["raj","sprawiedliwosc","wina_i_kara","wojna","zniewolenie"]},
+  "jan_parandowski_mitologia_cz_i_grecja": {title:"Jan Parandowski, Mitologia, cz. I Grecja", stage:"LO", g:["zaswiaty"], p:["bog","artysta","gory","labirynt","los_przeznaczenie","mi_osc","przemiana_bohatera","w_adca_w_adza","wojna","wybitne_jednostki","zemsta"]},
+  "homer_iliada_fragmenty": {title:"Homer, Iliada (fragmenty)", stage:"LO", g:["heroizm","odwaga","wojna","wojownik_rycerz"], p:["bog","godnosc","historia","los_przeznaczenie","pojedynek","przyjazn","smierc","w_adca_w_adza","wrog_zaborca"]},
+  "sofokles_antygona": {title:"Sofokles, Antygona", stage:"LO", g:["bunt","rodzina_relacje_rodzinne","sprawiedliwosc","wina_i_kara","w_adca_w_adza"], p:["bog","godnosc","kobieta","los_przeznaczenie","ojciec","poswiecenie","samotnosc","smierc"]},
+  "piesn_o_rolandzie_fragmenty": {title:"Pie\u015b\u0144 o Rolandzie (fragmenty)", stage:"LO", g:["bog","heroizm","odwaga","smierc","wojna","wojownik_rycerz"], p:["los_przeznaczenie","ojczyzna_patriotyzm","poswiecenie","przyjazn","w_adca_w_adza","wrog_zaborca"]},
+  "lament_swietokrzyski_fragmenty": {title:"Lament \u015bwi\u0119tokrzyski (fragmenty)", stage:"LO", g:["bog","cierpienie","dziecko","matka","strata","smierc"], p:["dobro_i_z_o","kobieta","poswiecenie","rodzina_relacje_rodzinne","samotnosc"]},
+  "rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty": {title:"Rozmowa Mistrza Polikarpa ze \u015amierci\u0105 (fragmenty)", stage:"LO", g:["niesta_osc_swiata","smierc","taniec_smierci","teatr_swiata"], p:["przemijanie","sprawiedliwosc","starosc","szlachta_obyczaje_szlacheckie","wina_i_kara"]},
+  "william_szekspir_makbet": {title:"William Szekspir, Makbet", stage:"LO", g:["dobro_i_z_o","proroctwo_widzenie","przemiana_bohatera","wina_i_kara","w_adca_w_adza"], p:["bunt","kobieta","los_przeznaczenie","ma_zenstwo","odwaga","sen_widmo_zjawa","szalenstwo","smierc","wojna"]},
+  "molier_skapiec": {title:"Molier, Sk\u0105piec", stage:"LO", g:["ma_zenstwo","pieniadze_majatek"], p:["dziecko","mi_osc","ojciec","pochodzenie","rodzina_relacje_rodzinne","szczescie","w_adca_w_adza"]},
+  "ignacy_krasicki_bajki_sp": {title:"Ignacy Krasicki, bajki", stage:"SP", g:["dobro_i_z_o","sprawiedliwosc"], p:["odwaga","pieniadze_majatek","praca","wina_i_kara","w_adca_w_adza"]},
+  "ignacy_krasicki_satyra_lo": {title:"Ignacy Krasicki, satyra", stage:"LO", g:["tradycja_obyczaj_zwyczaje","wady_narodowe"], p:["ma_zenstwo","pieniadze_majatek","pochodzenie","polska_i_polacy","wspolnota","szlachta_obyczaje_szlacheckie"]},
+  "adam_mickiewicz_ballady_w_tym_romantycznosc_lo": {title:"Adam Mickiewicz, ballady (w tym Romantyczno\u015b\u0107)", stage:"LO", g:["mi_osc","sen_widmo_zjawa","sprawiedliwosc_ludowa","tradycja_obyczaj_zwyczaje"], p:["bog","dziecko","dobro_i_z_o","kobieta","proroctwo_widzenie","szalenstwo","wies","wina_i_kara"]},
+  "adam_mickiewicz_dziady_cz_ii_sp": {title:"Adam Mickiewicz, Dziady cz. II", stage:"SP", g:["sen_widmo_zjawa","sprawiedliwosc_ludowa","tradycja_obyczaj_zwyczaje","wina_i_kara","zaswiaty"], p:["bog","dziecko","dziecinstwo","dobro_i_z_o","proroctwo_widzenie","smierc","wies"]},
+  "adam_mickiewicz_dziady_cz_iii": {title:"Adam Mickiewicz, Dziady cz. III", stage:"LO", g:["mesjanizm","niepodleg_osc","ojczyzna_patriotyzm","polska_i_polacy","proroctwo_widzenie","syberia","w_adca_w_adza","wolnosc","wrog_zaborca","zniewolenie"], p:["bog","bunt","cierpienie","historia","m_odosc","poswiecenie","powstania_narodowe","samotnosc","sen_widmo_zjawa"]},
+  "adam_mickiewicz_pan_tadeusz_sp": {title:"Adam Mickiewicz, Pan Tadeusz", stage:"SP", g:["dom","ojczyzna_patriotyzm","pamiec_wspomnienia","polska_i_polacy","szlachta_obyczaje_szlacheckie","tradycja_obyczaj_zwyczaje"], p:["arkadia","historia","ma_zenstwo","miejsce_szczesliwe","mi_osc","niepodleg_osc","wspolnota","pojedynek","powstania_narodowe","wies"]},
+  "aleksander_fredro_zemsta_sp": {title:"Aleksander Fredro, Zemsta", stage:"SP", g:["ma_zenstwo","zemsta"], p:["dom","konflikt_pokolen","mi_osc","pojedynek","rodzina_relacje_rodzinne","szlachta_obyczaje_szlacheckie","tradycja_obyczaj_zwyczaje"]},
+  "juliusz_s_owacki_balladyna_sp": {title:"Juliusz S\u0142owacki, Balladyna", stage:"SP", g:["dobro_i_z_o","kobieta","wina_i_kara","w_adca_w_adza"], p:["bog","matka","mi_osc","pochodzenie","sen_widmo_zjawa","sprawiedliwosc","smierc","wies","zemsta"]},
+  "fiodor_dostojewski_zbrodnia_i_kara": {title:"Fiodor Dostojewski, Zbrodnia i kara", stage:"LO", g:["cierpienie","dobro_i_z_o","idealizm","miasto","pieniadze_majatek","przemiana_bohatera","wina_i_kara"], p:["bog","kobieta","poswiecenie","praca","rodzina_relacje_rodzinne","samotnosc","sen_widmo_zjawa","sprawiedliwosc","wolnosc"]},
+  "henryk_sienkiewicz_potop_fragmenty": {title:"Henryk Sienkiewicz, Potop (fragmenty)", stage:"LO", g:["historia","ojczyzna_patriotyzm","polska_i_polacy","przemiana_bohatera","wojna","wojownik_rycerz"], p:["bog","heroizm","mi_osc","odwaga","poswiecenie","tradycja_obyczaj_zwyczaje","w_adca_w_adza","wrog_zaborca","wybitne_jednostki"]},
+  "boles_aw_prus_lalka": {title:"Boles\u0142aw Prus, Lalka", stage:"LO", g:["inteligent_intelektualista","miasto","mi_osc","pieniadze_majatek","pochodzenie"], p:["historia","idealizm","kobieta","marzycielstwo","marzenia","praca","przyjazn","samotnosc","syberia","wybitne_jednostki"]},
+  "stanis_aw_wyspianski_wesele": {title:"Stanis\u0142aw Wyspia\u0144ski, Wesele", stage:"LO", g:["inteligent_intelektualista","ojczyzna_patriotyzm","polska_i_polacy","wspolnota","sen_widmo_zjawa","taniec","tradycja_obyczaj_zwyczaje","wady_narodowe","wies"], p:["ma_zenstwo","marzenia","mi_osc","niepodleg_osc","powstania_narodowe","proroctwo_widzenie","szlachta_obyczaje_szlacheckie","w_adca_w_adza"]},
+  "w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty": {title:"W\u0142adys\u0142aw Stanis\u0142aw Reymont, Ch\u0142opi (fragmenty)", stage:"LO", g:["wspolnota","konflikt_pokolen","praca","rodzina_relacje_rodzinne","tradycja_obyczaj_zwyczaje","wies"], p:["dziecko","dom","kobieta","ma_zenstwo","matka","mi_osc","ojciec","starosc","taniec"]},
+  "stefan_zeromski_przedwiosnie": {title:"Stefan \u017beromski, Przedwio\u015bnie", stage:"LO", g:["historia","m_odosc","niepodleg_osc","polska_i_polacy","tozsamosc","utopia"], p:["idealizm","inteligent_intelektualista","marzenia","matka","miasto","ojciec","ojczyzna_patriotyzm","wspolnota","przemiana_bohatera","wojna"]},
+  "witold_gombrowicz_ferdydurke_fragmenty": {title:"Witold Gombrowicz, Ferdydurke (fragmenty)", stage:"LO", g:["bunt","indywidualizm","mistrz_i_uczen","tozsamosc","zniewolenie"], p:["autorytet","inteligent_intelektualista","konflikt_pokolen","m_odosc","wspolnota","rodzice_i_dzieci","szalenstwo","wolnosc"]},
+  "tadeusz_borowski_prosze_panstwa_do_gazu": {title:"Tadeusz Borowski, Prosz\u0119 pa\u0144stwa do gazu", stage:"LO", g:["cierpienie","ii_wojna_swiatowa","lager_oboz_koncentracyjny_oboz_zag_ady","smierc","zag_ada","zniewolenie","zydzi"], p:["dobro_i_z_o","godnosc","wspolnota","praca","samotnosc","strata","totalitaryzm","wojna"]},
+  "albert_camus_dzuma": {title:"Albert Camus, D\u017cuma", stage:"LO", g:["bunt","cierpienie","miasto","poswiecenie","smierc"], p:["bog","dobro_i_z_o","godnosc","wspolnota","przyjazn","samotnosc","strata","szczescie","walka_ze_s_abosciami","wolnosc"]},
+  "george_orwell_rok_1984": {title:"George Orwell, Rok 1984", stage:"LO", g:["nowomowa","propaganda","totalitaryzm","w_adca_w_adza","wolnosc","zniewolenie"], p:["bunt","dobro_i_z_o","historia","mi_osc","pamiec_wspomnienia","przesz_osc","samotnosc","utopia"]},
+  "gustaw_herling_grudzinski_inny_swiat_fragmenty": {title:"Gustaw Herling-Grudzi\u0144ski, Inny \u015bwiat (fragmenty)", stage:"LO", g:["cierpienie","godnosc","agier","praca","samotnosc","totalitaryzm","zniewolenie"], p:["bog","dobro_i_z_o","wspolnota","strata","syberia","smierc","wolnosc","wojna"]},
+  "s_awomir_mrozek_tango": {title:"S\u0142awomir Mr\u00f3\u017cek, Tango", stage:"LO", g:["bunt","konflikt_pokolen","rodzina_relacje_rodzinne","taniec","w_adca_w_adza","wolnosc"], p:["artysta","autorytet","indywidualizm","ma_zenstwo","sztuka","tradycja_obyczaj_zwyczaje","totalitaryzm"]},
+  "hanna_krall_zdazyc_przed_panem_bogiem": {title:"Hanna Krall, Zd\u0105\u017cy\u0107 przed Panem Bogiem", stage:"LO", g:["ii_wojna_swiatowa","pamiec_wspomnienia","smierc","zag_ada","zydzi"], p:["bog","godnosc","heroizm","miasto","wspolnota","poswiecenie","praca","strata"]},
+  "marek_nowakowski_gora_edek": {title:'Marek Nowakowski, G\u00f3r\u0105 \u201eEdek\u201d', stage:"LO", g:["codziennosc","miasto"], p:["bunt","polska_i_polacy","wspolnota","tradycja_obyczaj_zwyczaje","w_adca_w_adza","wolnosc","zniewolenie"]},
+  "andrzej_stasiuk_miejsce": {title:"Andrzej Stasiuk, Miejsce", stage:"LO", g:["historia","pamiec_wspomnienia","przesz_osc"], p:["bog","polska_i_polacy","wspolnota","podroz_tu_aczka_wedrowka_pielgrzymka","samotnosc","wies"]},
+  "olga_tokarczuk_profesor_andrews_w_warszawie": {title:"Olga Tokarczuk, Profesor Andrews w Warszawie", stage:"LO", g:["codziennosc","miasto","polska_i_polacy"], p:["historia","inteligent_intelektualista","podroz_tu_aczka_wedrowka_pielgrzymka","samotnosc","totalitaryzm","wolnosc","zniewolenie"]},
+  "ryszard_kapuscinski_podroze_z_herodotem_fragmenty": {title:"Ryszard Kapu\u015bci\u0144ski, Podr\u00f3\u017ce z Herodotem (fragmenty)", stage:"LO", g:["bohater_z_ksiazka","historia","podroz_tu_aczka_wedrowka_pielgrzymka"], p:["artysta","autorytet","mistrz_i_uczen","wspolnota","tozsamosc","wojna","wybitne_jednostki"]},
+};
+
+const MOTYWY_DATA = {
+  "apokalipsa": {label:"apokalipsa", g:["biblia_apokalipsa_sw_jana"], p:[]},
+  "arkadia": {label:"Arkadia", g:[], p:["adam_mickiewicz_pan_tadeusz_sp"]},
+  "artysta": {label:"artysta", g:[], p:["jan_parandowski_mitologia_cz_i_grecja","s_awomir_mrozek_tango","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "autorytet": {label:"autorytet", g:[], p:["witold_gombrowicz_ferdydurke_fragmenty","s_awomir_mrozek_tango","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "bog": {label:"B\u00f3g, bogowie", g:["biblia_ksiega_rodzaju","biblia_ksiega_hioba","biblia_ksiega_koheleta","biblia_ksiega_psalmow","biblia_apokalipsa_sw_jana","piesn_o_rolandzie_fragmenty","lament_swietokrzyski_fragmenty"], p:["jan_parandowski_mitologia_cz_i_grecja","sofokles_antygona","homer_iliada_fragmenty","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","adam_mickiewicz_dziady_cz_iii","juliusz_s_owacki_balladyna_sp","fiodor_dostojewski_zbrodnia_i_kara","henryk_sienkiewicz_potop_fragmenty","albert_camus_dzuma","gustaw_herling_grudzinski_inny_swiat_fragmenty","hanna_krall_zdazyc_przed_panem_bogiem","andrzej_stasiuk_miejsce"]},
+  "bohater_z_ksiazka": {label:"bohater z ksi\u0105\u017ck\u0105", g:["ryszard_kapuscinski_podroze_z_herodotem_fragmenty"], p:[]},
+  "bunt": {label:"bunt", g:["sofokles_antygona","witold_gombrowicz_ferdydurke_fragmenty","albert_camus_dzuma","s_awomir_mrozek_tango"], p:["william_szekspir_makbet","adam_mickiewicz_dziady_cz_iii","george_orwell_rok_1984","marek_nowakowski_gora_edek"]},
+  "cierpienie": {label:"cierpienie", g:["biblia_ksiega_hioba","lament_swietokrzyski_fragmenty","fiodor_dostojewski_zbrodnia_i_kara","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["biblia_ksiega_psalmow","adam_mickiewicz_dziady_cz_iii"]},
+  "cierpienie_niezawinione": {label:"cierpienie niezawinione", g:["biblia_ksiega_hioba"], p:[]},
+  "codziennosc": {label:"codzienno\u015b\u0107", g:["marek_nowakowski_gora_edek","olga_tokarczuk_profesor_andrews_w_warszawie"], p:[]},
+  "dziecko": {label:"dziecko", g:["lament_swietokrzyski_fragmenty"], p:["biblia_ksiega_rodzaju","molier_skapiec","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"]},
+  "dziecinstwo": {label:"dzieci\u0144stwo", g:[], p:["adam_mickiewicz_dziady_cz_ii_sp"]},
+  "dobro_i_z_o": {label:"dobro i z\u0142o", g:["biblia_ksiega_rodzaju","biblia_apokalipsa_sw_jana","william_szekspir_makbet","ignacy_krasicki_bajki_sp","juliusz_s_owacki_balladyna_sp","fiodor_dostojewski_zbrodnia_i_kara"], p:["lament_swietokrzyski_fragmenty","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","george_orwell_rok_1984","gustaw_herling_grudzinski_inny_swiat_fragmenty"]},
+  "dom": {label:"dom", g:["adam_mickiewicz_pan_tadeusz_sp"], p:["biblia_ksiega_rodzaju","aleksander_fredro_zemsta_sp","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"]},
+  "godnosc": {label:"godno\u015b\u0107", g:["gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["homer_iliada_fragmenty","sofokles_antygona","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "gory": {label:"g\u00f3ry", g:[], p:["jan_parandowski_mitologia_cz_i_grecja"]},
+  "historia": {label:"historia", g:["henryk_sienkiewicz_potop_fragmenty","stefan_zeromski_przedwiosnie","andrzej_stasiuk_miejsce","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"], p:["homer_iliada_fragmenty","adam_mickiewicz_dziady_cz_iii","adam_mickiewicz_pan_tadeusz_sp","boles_aw_prus_lalka","george_orwell_rok_1984","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "heroizm": {label:"heroizm", g:["homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty"], p:["henryk_sienkiewicz_potop_fragmenty","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "idealizm": {label:"idealizm", g:["fiodor_dostojewski_zbrodnia_i_kara"], p:["boles_aw_prus_lalka","stefan_zeromski_przedwiosnie"]},
+  "ii_wojna_swiatowa": {label:"II wojna \u015bwiatowa", g:["tadeusz_borowski_prosze_panstwa_do_gazu","hanna_krall_zdazyc_przed_panem_bogiem"], p:[]},
+  "indywidualizm": {label:"indywidualizm", g:["witold_gombrowicz_ferdydurke_fragmenty"], p:["s_awomir_mrozek_tango"]},
+  "inteligent_intelektualista": {label:"inteligent, intelektualista", g:["boles_aw_prus_lalka","stanis_aw_wyspianski_wesele"], p:["stefan_zeromski_przedwiosnie","witold_gombrowicz_ferdydurke_fragmenty","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "kobieta": {label:"kobieta", g:["juliusz_s_owacki_balladyna_sp"], p:["sofokles_antygona","lament_swietokrzyski_fragmenty","william_szekspir_makbet","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","fiodor_dostojewski_zbrodnia_i_kara","boles_aw_prus_lalka","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"]},
+  "konflikt_pokolen": {label:"konflikt pokole\u0144", g:["s_awomir_mrozek_tango","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"], p:["aleksander_fredro_zemsta_sp","witold_gombrowicz_ferdydurke_fragmenty"]},
+  "labirynt": {label:"labirynt", g:[], p:["jan_parandowski_mitologia_cz_i_grecja"]},
+  "lager_oboz_koncentracyjny_oboz_zag_ady": {label:"lager, ob\u00f3z koncentracyjny", g:["tadeusz_borowski_prosze_panstwa_do_gazu"], p:[]},
+  "los_przeznaczenie": {label:"los, przeznaczenie", g:["biblia_ksiega_hioba"], p:["biblia_ksiega_koheleta","jan_parandowski_mitologia_cz_i_grecja","homer_iliada_fragmenty","sofokles_antygona","piesn_o_rolandzie_fragmenty","william_szekspir_makbet"]},
+  "agier": {label:"\u0142agier", g:["gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:[]},
+  "ma_zenstwo": {label:"ma\u0142\u017ce\u0144stwo", g:["molier_skapiec","aleksander_fredro_zemsta_sp"], p:["william_szekspir_makbet","ignacy_krasicki_satyra_lo","adam_mickiewicz_pan_tadeusz_sp","stanis_aw_wyspianski_wesele","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","s_awomir_mrozek_tango"]},
+  "marzycielstwo": {label:"marzycielstwo", g:[], p:["boles_aw_prus_lalka"]},
+  "marzenia": {label:"marzenia", g:[], p:["boles_aw_prus_lalka","stanis_aw_wyspianski_wesele","stefan_zeromski_przedwiosnie"]},
+  "matka": {label:"matka", g:["lament_swietokrzyski_fragmenty"], p:["biblia_ksiega_rodzaju","juliusz_s_owacki_balladyna_sp","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","stefan_zeromski_przedwiosnie"]},
+  "mesjanizm": {label:"mesjanizm", g:["adam_mickiewicz_dziady_cz_iii"], p:[]},
+  "miejsce_szczesliwe": {label:"miejsce szcz\u0119\u015bliwe", g:[], p:["adam_mickiewicz_pan_tadeusz_sp"]},
+  "miasto": {label:"miasto", g:["fiodor_dostojewski_zbrodnia_i_kara","boles_aw_prus_lalka","albert_camus_dzuma","marek_nowakowski_gora_edek","olga_tokarczuk_profesor_andrews_w_warszawie"], p:["stefan_zeromski_przedwiosnie","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "mi_osc": {label:"mi\u0142o\u015b\u0107", g:["adam_mickiewicz_ballady_w_tym_romantycznosc_lo","boles_aw_prus_lalka"], p:["jan_parandowski_mitologia_cz_i_grecja","molier_skapiec","adam_mickiewicz_pan_tadeusz_sp","aleksander_fredro_zemsta_sp","juliusz_s_owacki_balladyna_sp","henryk_sienkiewicz_potop_fragmenty","stanis_aw_wyspianski_wesele","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","george_orwell_rok_1984"]},
+  "mistrz_i_uczen": {label:"mistrz i ucze\u0144", g:["witold_gombrowicz_ferdydurke_fragmenty"], p:["ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "m_odosc": {label:"m\u0142odo\u015b\u0107", g:["stefan_zeromski_przedwiosnie"], p:["adam_mickiewicz_dziady_cz_iii","witold_gombrowicz_ferdydurke_fragmenty"]},
+  "niepodleg_osc": {label:"niepodleg\u0142o\u015b\u0107", g:["adam_mickiewicz_dziady_cz_iii","stefan_zeromski_przedwiosnie"], p:["adam_mickiewicz_pan_tadeusz_sp","stanis_aw_wyspianski_wesele"]},
+  "niesta_osc_swiata": {label:"niesta\u0142o\u015b\u0107 \u015bwiata", g:["biblia_ksiega_koheleta","rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty"], p:["biblia_ksiega_hioba"]},
+  "nowomowa": {label:"nowomowa", g:["george_orwell_rok_1984"], p:[]},
+  "odwaga": {label:"odwaga", g:["homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty"], p:["william_szekspir_makbet","ignacy_krasicki_bajki_sp","henryk_sienkiewicz_potop_fragmenty"]},
+  "ogrod": {label:"ogr\u00f3d", g:["biblia_ksiega_rodzaju"], p:[]},
+  "ojciec": {label:"ojciec", g:[], p:["biblia_ksiega_rodzaju","sofokles_antygona","molier_skapiec","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","stefan_zeromski_przedwiosnie"]},
+  "ojczyzna_patriotyzm": {label:"ojczyzna, patriotyzm", g:["adam_mickiewicz_dziady_cz_iii","adam_mickiewicz_pan_tadeusz_sp","henryk_sienkiewicz_potop_fragmenty","stanis_aw_wyspianski_wesele"], p:["biblia_ksiega_psalmow","piesn_o_rolandzie_fragmenty","stefan_zeromski_przedwiosnie"]},
+  "pamiec_wspomnienia": {label:"pami\u0119\u0107, wspomnienia", g:["adam_mickiewicz_pan_tadeusz_sp","hanna_krall_zdazyc_przed_panem_bogiem","andrzej_stasiuk_miejsce"], p:["biblia_ksiega_hioba","george_orwell_rok_1984"]},
+  "pieniadze_majatek": {label:"pieni\u0105dze, maj\u0105tek", g:["molier_skapiec","fiodor_dostojewski_zbrodnia_i_kara","boles_aw_prus_lalka"], p:["biblia_ksiega_koheleta","ignacy_krasicki_bajki_sp","ignacy_krasicki_satyra_lo"]},
+  "pochodzenie": {label:"pochodzenie", g:["boles_aw_prus_lalka"], p:["molier_skapiec","ignacy_krasicki_satyra_lo","juliusz_s_owacki_balladyna_sp"]},
+  "polska_i_polacy": {label:"Polska i Polacy", g:["adam_mickiewicz_dziady_cz_iii","adam_mickiewicz_pan_tadeusz_sp","henryk_sienkiewicz_potop_fragmenty","stanis_aw_wyspianski_wesele","stefan_zeromski_przedwiosnie","olga_tokarczuk_profesor_andrews_w_warszawie"], p:["ignacy_krasicki_satyra_lo","marek_nowakowski_gora_edek","andrzej_stasiuk_miejsce"]},
+  "wspolnota": {label:"wsp\u00f3lnota", g:["stanis_aw_wyspianski_wesele","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"], p:["biblia_ksiega_psalmow","ignacy_krasicki_satyra_lo","adam_mickiewicz_pan_tadeusz_sp","stefan_zeromski_przedwiosnie","witold_gombrowicz_ferdydurke_fragmenty","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","gustaw_herling_grudzinski_inny_swiat_fragmenty","hanna_krall_zdazyc_przed_panem_bogiem","marek_nowakowski_gora_edek","andrzej_stasiuk_miejsce","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "podroz_tu_aczka_wedrowka_pielgrzymka": {label:"podr\u00f3\u017c, tu\u0142aczka, w\u0119dr\u00f3wka", g:["ryszard_kapuscinski_podroze_z_herodotem_fragmenty"], p:["biblia_ksiega_rodzaju","andrzej_stasiuk_miejsce","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "pojedynek": {label:"pojedynek", g:[], p:["homer_iliada_fragmenty","adam_mickiewicz_pan_tadeusz_sp","aleksander_fredro_zemsta_sp"]},
+  "poswiecenie": {label:"po\u015bwi\u0119cenie", g:["albert_camus_dzuma"], p:["sofokles_antygona","piesn_o_rolandzie_fragmenty","lament_swietokrzyski_fragmenty","adam_mickiewicz_dziady_cz_iii","fiodor_dostojewski_zbrodnia_i_kara","henryk_sienkiewicz_potop_fragmenty","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "powstania_narodowe": {label:"powstania narodowe", g:[], p:["adam_mickiewicz_dziady_cz_iii","adam_mickiewicz_pan_tadeusz_sp","stanis_aw_wyspianski_wesele"]},
+  "praca": {label:"praca", g:["w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["biblia_ksiega_rodzaju","biblia_ksiega_koheleta","ignacy_krasicki_bajki_sp","fiodor_dostojewski_zbrodnia_i_kara","boles_aw_prus_lalka","tadeusz_borowski_prosze_panstwa_do_gazu","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "propaganda": {label:"propaganda", g:["george_orwell_rok_1984"], p:[]},
+  "proroctwo_widzenie": {label:"proroctwo, widzenie", g:["biblia_apokalipsa_sw_jana","william_szekspir_makbet","adam_mickiewicz_dziady_cz_iii"], p:["adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","stanis_aw_wyspianski_wesele"]},
+  "przesz_osc": {label:"przesz\u0142o\u015b\u0107", g:["andrzej_stasiuk_miejsce"], p:["george_orwell_rok_1984"]},
+  "przemiana_bohatera": {label:"przemiana bohatera", g:["william_szekspir_makbet","fiodor_dostojewski_zbrodnia_i_kara","henryk_sienkiewicz_potop_fragmenty"], p:["jan_parandowski_mitologia_cz_i_grecja","stefan_zeromski_przedwiosnie"]},
+  "przemijanie": {label:"przemijanie", g:["biblia_ksiega_koheleta"], p:["rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty"]},
+  "przyjazn": {label:"przyja\u017a\u0144", g:[], p:["homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty","boles_aw_prus_lalka","albert_camus_dzuma"]},
+  "raj": {label:"raj", g:["biblia_ksiega_rodzaju"], p:["biblia_apokalipsa_sw_jana"]},
+  "rodzice_i_dzieci": {label:"rodzice i dzieci", g:[], p:["witold_gombrowicz_ferdydurke_fragmenty"]},
+  "rodzina_relacje_rodzinne": {label:"rodzina, relacje rodzinne", g:["biblia_ksiega_rodzaju","sofokles_antygona","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty","s_awomir_mrozek_tango"], p:["lament_swietokrzyski_fragmenty","molier_skapiec","aleksander_fredro_zemsta_sp","fiodor_dostojewski_zbrodnia_i_kara"]},
+  "rozstanie": {label:"rozstanie", g:[], p:[]},
+  "samotnosc": {label:"samotno\u015b\u0107", g:["gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["biblia_ksiega_hioba","sofokles_antygona","lament_swietokrzyski_fragmenty","adam_mickiewicz_dziady_cz_iii","fiodor_dostojewski_zbrodnia_i_kara","boles_aw_prus_lalka","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","george_orwell_rok_1984","andrzej_stasiuk_miejsce","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "sen_widmo_zjawa": {label:"sen, widmo, zjawa", g:["adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","stanis_aw_wyspianski_wesele"], p:["william_szekspir_makbet","adam_mickiewicz_dziady_cz_iii","juliusz_s_owacki_balladyna_sp","fiodor_dostojewski_zbrodnia_i_kara"]},
+  "sprawiedliwosc": {label:"sprawiedliwo\u015b\u0107", g:["sofokles_antygona","ignacy_krasicki_bajki_sp"], p:["biblia_ksiega_hioba","biblia_ksiega_psalmow","biblia_apokalipsa_sw_jana","rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty","juliusz_s_owacki_balladyna_sp","fiodor_dostojewski_zbrodnia_i_kara"]},
+  "sprawiedliwosc_ludowa": {label:"sprawiedliwo\u015b\u0107 ludowa", g:["adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp"], p:[]},
+  "starosc": {label:"staro\u015b\u0107", g:[], p:["biblia_ksiega_koheleta","rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"]},
+  "strata": {label:"strata", g:["biblia_ksiega_hioba","lament_swietokrzyski_fragmenty"], p:["tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","gustaw_herling_grudzinski_inny_swiat_fragmenty","hanna_krall_zdazyc_przed_panem_bogiem"]},
+  "sztuka": {label:"sztuka", g:[], p:["s_awomir_mrozek_tango"]},
+  "syberia": {label:"Syberia", g:["adam_mickiewicz_dziady_cz_iii"], p:["boles_aw_prus_lalka","gustaw_herling_grudzinski_inny_swiat_fragmenty"]},
+  "szczescie": {label:"szcz\u0119\u015bcie", g:[], p:["biblia_ksiega_koheleta","molier_skapiec","albert_camus_dzuma"]},
+  "szalenstwo": {label:"szale\u0144stwo", g:[], p:["william_szekspir_makbet","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","witold_gombrowicz_ferdydurke_fragmenty"]},
+  "szlachta_obyczaje_szlacheckie": {label:"szlachta, obyczaje szlacheckie", g:["adam_mickiewicz_pan_tadeusz_sp"], p:["rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty","ignacy_krasicki_satyra_lo","aleksander_fredro_zemsta_sp","stanis_aw_wyspianski_wesele"]},
+  "smierc": {label:"\u015bmier\u0107", g:["biblia_apokalipsa_sw_jana","lament_swietokrzyski_fragmenty","piesn_o_rolandzie_fragmenty","rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty","tadeusz_borowski_prosze_panstwa_do_gazu","albert_camus_dzuma","hanna_krall_zdazyc_przed_panem_bogiem"], p:["biblia_ksiega_hioba","biblia_ksiega_koheleta","homer_iliada_fragmenty","sofokles_antygona","william_szekspir_makbet","adam_mickiewicz_dziady_cz_ii_sp","juliusz_s_owacki_balladyna_sp","gustaw_herling_grudzinski_inny_swiat_fragmenty"]},
+  "taniec": {label:"taniec", g:["stanis_aw_wyspianski_wesele","s_awomir_mrozek_tango"], p:["w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"]},
+  "taniec_smierci": {label:"taniec \u015bmierci", g:["rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty"], p:[]},
+  "teatr_swiata": {label:"teatr \u015bwiata", g:["rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty"], p:[]},
+  "tozsamosc": {label:"to\u017csamo\u015b\u0107", g:["stefan_zeromski_przedwiosnie","witold_gombrowicz_ferdydurke_fragmenty"], p:["ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "tradycja_obyczaj_zwyczaje": {label:"tradycja, obyczaj, zwyczaje", g:["ignacy_krasicki_satyra_lo","adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","adam_mickiewicz_pan_tadeusz_sp","stanis_aw_wyspianski_wesele","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"], p:["aleksander_fredro_zemsta_sp","henryk_sienkiewicz_potop_fragmenty","s_awomir_mrozek_tango","marek_nowakowski_gora_edek"]},
+  "totalitaryzm": {label:"totalitaryzm", g:["george_orwell_rok_1984","gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["tadeusz_borowski_prosze_panstwa_do_gazu","s_awomir_mrozek_tango","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "utopia": {label:"utopia", g:["stefan_zeromski_przedwiosnie"], p:["george_orwell_rok_1984"]},
+  "wady_narodowe": {label:"wady narodowe", g:["ignacy_krasicki_satyra_lo","stanis_aw_wyspianski_wesele"], p:[]},
+  "walka_ze_s_abosciami": {label:"walka ze s\u0142abo\u015bciami", g:[], p:["albert_camus_dzuma"]},
+  "wies": {label:"wie\u015b", g:["stanis_aw_wyspianski_wesele","w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty"], p:["adam_mickiewicz_ballady_w_tym_romantycznosc_lo","adam_mickiewicz_dziady_cz_ii_sp","adam_mickiewicz_pan_tadeusz_sp","juliusz_s_owacki_balladyna_sp","andrzej_stasiuk_miejsce"]},
+  "wina_i_kara": {label:"wina i kara", g:["sofokles_antygona","william_szekspir_makbet","adam_mickiewicz_dziady_cz_ii_sp","juliusz_s_owacki_balladyna_sp","fiodor_dostojewski_zbrodnia_i_kara"], p:["biblia_ksiega_rodzaju","biblia_ksiega_hioba","biblia_ksiega_psalmow","biblia_apokalipsa_sw_jana","rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty","ignacy_krasicki_bajki_sp","adam_mickiewicz_ballady_w_tym_romantycznosc_lo"]},
+  "w_adca_w_adza": {label:"w\u0142adca, w\u0142adza", g:["sofokles_antygona","william_szekspir_makbet","adam_mickiewicz_dziady_cz_iii","juliusz_s_owacki_balladyna_sp","george_orwell_rok_1984","s_awomir_mrozek_tango"], p:["jan_parandowski_mitologia_cz_i_grecja","homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty","molier_skapiec","ignacy_krasicki_bajki_sp","henryk_sienkiewicz_potop_fragmenty","stanis_aw_wyspianski_wesele","marek_nowakowski_gora_edek"]},
+  "wolnosc": {label:"wolno\u015b\u0107", g:["adam_mickiewicz_dziady_cz_iii","george_orwell_rok_1984","s_awomir_mrozek_tango"], p:["fiodor_dostojewski_zbrodnia_i_kara","witold_gombrowicz_ferdydurke_fragmenty","albert_camus_dzuma","gustaw_herling_grudzinski_inny_swiat_fragmenty","marek_nowakowski_gora_edek","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "wojna": {label:"wojna", g:["homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty","henryk_sienkiewicz_potop_fragmenty"], p:["biblia_ksiega_psalmow","biblia_apokalipsa_sw_jana","jan_parandowski_mitologia_cz_i_grecja","william_szekspir_makbet","stefan_zeromski_przedwiosnie","tadeusz_borowski_prosze_panstwa_do_gazu","gustaw_herling_grudzinski_inny_swiat_fragmenty","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "wojownik_rycerz": {label:"wojownik, rycerz", g:["homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty","henryk_sienkiewicz_potop_fragmenty"], p:[]},
+  "wrog_zaborca": {label:"wr\u00f3g, zaborca", g:["adam_mickiewicz_dziady_cz_iii"], p:["biblia_ksiega_rodzaju","homer_iliada_fragmenty","piesn_o_rolandzie_fragmenty","henryk_sienkiewicz_potop_fragmenty"]},
+  "wybitne_jednostki": {label:"wybitne jednostki", g:[], p:["jan_parandowski_mitologia_cz_i_grecja","henryk_sienkiewicz_potop_fragmenty","boles_aw_prus_lalka","ryszard_kapuscinski_podroze_z_herodotem_fragmenty"]},
+  "zag_ada": {label:"Zag\u0142ada", g:["tadeusz_borowski_prosze_panstwa_do_gazu","hanna_krall_zdazyc_przed_panem_bogiem"], p:[]},
+  "zaswiaty": {label:"za\u015bwiaty", g:["biblia_apokalipsa_sw_jana","jan_parandowski_mitologia_cz_i_grecja","adam_mickiewicz_dziady_cz_ii_sp"], p:[]},
+  "zemsta": {label:"zemsta", g:["aleksander_fredro_zemsta_sp"], p:["jan_parandowski_mitologia_cz_i_grecja","juliusz_s_owacki_balladyna_sp"]},
+  "zniewolenie": {label:"zniewolenie", g:["adam_mickiewicz_dziady_cz_iii","witold_gombrowicz_ferdydurke_fragmenty","tadeusz_borowski_prosze_panstwa_do_gazu","george_orwell_rok_1984","gustaw_herling_grudzinski_inny_swiat_fragmenty"], p:["biblia_apokalipsa_sw_jana","marek_nowakowski_gora_edek","olga_tokarczuk_profesor_andrews_w_warszawie"]},
+  "zydzi": {label:"\u017bydzi", g:["tadeusz_borowski_prosze_panstwa_do_gazu","hanna_krall_zdazyc_przed_panem_bogiem"], p:[]},
+};
+
+// Flat arrays for easy access
+const WORKS = Object.entries(LEKTURY_DATA).map(([id, d]) => ({ id, ...d }));
+const MOTIFS = Object.entries(MOTYWY_DATA).map(([id, d]) => ({ id, ...d }));
+
+// Filter only motifs with at least 1 lektura (g or p)
+const MOTIFS_ACTIVE = MOTIFS.filter(m => m.g.length + m.p.length > 0);
+const WORKS_WITH_MOTIFS = WORKS.filter(w => w.g.length > 0);
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+
+function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+function pickDistractors(correctIds, pool, n) {
+  return shuffle(pool.filter(x => !correctIds.includes(x))).slice(0, n);
+}
+
+// ─── QUESTION GENERATORS ────────────────────────────────
+
+function genMatchMotywDoLektury(n = 8) {
+  // Pokazujemy lekturę, gracz wybiera JEDEN motyw główny.
+  // Poprawna = DOWOLNA odpowiedź z work.g (wszystkie główne).
+  // Dystraktorzy: motywy których lektura nie ma wcale (nie g, nie p).
+  const qs = [];
+  const pool = shuffle(WORKS_WITH_MOTIFS.filter(w => w.g.length >= 1));
+  for (let i = 0; i < Math.min(n, pool.length); i++) {
+    const work = pool[i];
+    const correctIds = work.g; // wszystkie główne
+    const shownCorrectId = rnd(correctIds); // ten jeden pojawi się w opcjach jako "wzorcowy"
+    const notRelated = MOTIFS_ACTIVE.map(m => m.id)
+      .filter(id => !correctIds.includes(id) && !work.p.includes(id));
+    const wrongIds = shuffle(notRelated).slice(0, 3);
+    // opcje: jeden główny + 3 niezwiązanych
+    const options = shuffle([shownCorrectId, ...wrongIds])
+      .map(id => ({ id, label: MOTYWY_DATA[id]?.label || id }));
+    const correctLabels = correctIds.map(id => MOTYWY_DATA[id]?.label || id).join(', ');
+    qs.push({ type: 'match_motyw', work, correctIds, shownCorrectId, options,
+      feedbackOk: `Dobrze! To jeden z głównych motywów tej lektury.`,
+      feedbackBlad: `Główne motywy tej lektury to: ${correctLabels}.` });
+  }
+  return qs;
+}
+
+function genMatchLekturaDoMotywu(n = 8) {
+  // Pokazujemy motyw, gracz wybiera lekturę w której jest GŁÓWNY.
+  // Poprawna = DOWOLNA lektura z motif.g.
+  // Dystraktorzy: lektury które tego motywu nie mają wcale (nie g, nie p).
+  const qs = [];
+  const pool = shuffle(MOTIFS_ACTIVE.filter(m => m.g.length >= 1));
+  for (let i = 0; i < Math.min(n, pool.length); i++) {
+    const motif = pool[i];
+    const correctIds = motif.g;
+    const shownCorrectId = rnd(correctIds);
+    const correct = LEKTURY_DATA[shownCorrectId];
+    if (!correct) continue;
+    const notRelated = WORKS.map(w => w.id)
+      .filter(id => !correctIds.includes(id) && !motif.p.includes(id));
+    const wrongIds = shuffle(notRelated).slice(0, 3);
+    const options = shuffle([shownCorrectId, ...wrongIds])
+      .map(id => ({ id, title: LEKTURY_DATA[id]?.title || id }));
+    const correctTitles = correctIds
+      .map(id => (LEKTURY_DATA[id]?.title || id).replace(/^[^,]+,\s*/, '').split('(')[0].trim())
+      .join(', ');
+    qs.push({ type: 'match_lektura', motif, correctIds, shownCorrectId, options,
+      feedbackOk: `Dobrze! Motyw "${motif.label}" jest główny w tej lekturze.`,
+      feedbackBlad: `Motyw "${motif.label}" jest główny w: ${correctTitles}.` });
+  }
+  return qs;
+}
+
+function genNetwork() {
+  const EPOCH_GROUPS_ANCIENT = ['biblia_ksiega_rodzaju','biblia_ksiega_hioba','biblia_ksiega_koheleta',
+    'biblia_ksiega_psalmow','biblia_apokalipsa_sw_jana','homer_iliada_fragmenty',
+    'sofokles_antygona','piesn_o_rolandzie_fragmenty','lament_swietokrzyski_fragmenty',
+    'rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty'];
+
+  const motif = rnd(MOTIFS_ACTIVE.filter(m => m.g.length >= 2));
+  const correctIds = motif.g;
+  const correctWorks = correctIds
+    .map(id => LEKTURY_DATA[id] ? { id, ...LEKTURY_DATA[id] } : null)
+    .filter(Boolean);
+
+  const wrongAll = shuffle(
+    WORKS.filter(w => !correctIds.includes(w.id) && !motif.p.includes(w.id))
+  );
+
+  let ancientCount = correctWorks.filter(w => EPOCH_GROUPS_ANCIENT.includes(w.id)).length;
+  const balancedWrong = [];
+  for (const w of wrongAll) {
+    const isAncient = EPOCH_GROUPS_ANCIENT.includes(w.id);
+    if (isAncient && ancientCount >= 2) continue;
+    if (isAncient) ancientCount++;
+    balancedWrong.push(w);
+    if (balancedWrong.length >= 6) break;
+  }
+
+  const poolCorrect = shuffle(correctWorks).slice(0, Math.min(4, correctWorks.length));
+  const poolWrong = balancedWrong.slice(0, 12 - poolCorrect.length);
+  const pool = shuffle([...poolCorrect, ...poolWrong]);
+  return { motif, correctIds, pool };
+}
+
+function genScale() {
+  // 12 osi interpretacyjnych — każda oparta na treści lektur
+  const AXES = [
+    {
+      left: 'jednostka', right: 'wspólnota',
+      desc: 'Czy bohater działa w imię własne, czy grupy?',
+      leftG: ['sofokles_antygona','fiodor_dostojewski_zbrodnia_i_kara','witold_gombrowicz_ferdydurke_fragmenty','albert_camus_dzuma'],
+      rightG: ['w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty','piesn_o_rolandzie_fragmenty','adam_mickiewicz_dziady_cz_iii','stanis_aw_wyspianski_wesele'],
+      centerG: ['boles_aw_prus_lalka','homer_iliada_fragmenty'],
+    },
+    {
+      left: 'bunt', right: 'posłuszeństwo',
+      desc: 'Czy bohater sprzeciwia się, czy podporządkowuje?',
+      leftG: ['sofokles_antygona','witold_gombrowicz_ferdydurke_fragmenty','s_awomir_mrozek_tango','adam_mickiewicz_dziady_cz_iii'],
+      rightG: ['piesn_o_rolandzie_fragmenty','henryk_sienkiewicz_potop_fragmenty','ignacy_krasicki_bajki_sp'],
+      centerG: ['william_szekspir_makbet','boles_aw_prus_lalka'],
+    },
+    {
+      left: 'wolność', right: 'zniewolenie',
+      desc: 'Czy bohater jest wolny, czy pozbawiony wolności?',
+      leftG: ['sofokles_antygona','s_awomir_mrozek_tango','albert_camus_dzuma'],
+      rightG: ['george_orwell_rok_1984','gustaw_herling_grudzinski_inny_swiat_fragmenty','tadeusz_borowski_prosze_panstwa_do_gazu','adam_mickiewicz_dziady_cz_iii'],
+      centerG: ['witold_gombrowicz_ferdydurke_fragmenty','fiodor_dostojewski_zbrodnia_i_kara'],
+    },
+    {
+      left: 'nadzieja', right: 'beznadzeja',
+      desc: 'Czy utwór daje nadziejé, czy kończy się bez niej?',
+      leftG: ['adam_mickiewicz_dziady_cz_iii','henryk_sienkiewicz_potop_fragmenty','adam_mickiewicz_pan_tadeusz_sp'],
+      rightG: ['tadeusz_borowski_prosze_panstwa_do_gazu','rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty','biblia_ksiega_koheleta'],
+      centerG: ['albert_camus_dzuma','biblia_ksiega_hioba','fiodor_dostojewski_zbrodnia_i_kara'],
+    },
+    {
+      left: 'wiara', right: 'bunt wobec Boga',
+      desc: 'Jaki jest stosunek bohatera do Boga / transcendencji?',
+      leftG: ['lament_swietokrzyski_fragmenty','piesn_o_rolandzie_fragmenty','biblia_ksiega_psalmow','adam_mickiewicz_dziady_cz_ii_sp'],
+      rightG: ['albert_camus_dzuma','biblia_ksiega_hioba','adam_mickiewicz_dziady_cz_iii'],
+      centerG: ['fiodor_dostojewski_zbrodnia_i_kara','gustaw_herling_grudzinski_inny_swiat_fragmenty'],
+    },
+    {
+      left: 'heroizm', right: 'upadek moralny',
+      desc: 'Czy bohater wznosi się moralnie, czy upada?',
+      leftG: ['piesn_o_rolandzie_fragmenty','homer_iliada_fragmenty','sofokles_antygona','albert_camus_dzuma'],
+      rightG: ['william_szekspir_makbet','tadeusz_borowski_prosze_panstwa_do_gazu'],
+      centerG: ['fiodor_dostojewski_zbrodnia_i_kara','henryk_sienkiewicz_potop_fragmenty'],
+    },
+    {
+      left: 'pamięć / tradycja', right: 'zerwanie z przeszłością',
+      desc: 'Czy utwór afirmuje tradycję, czy ją odrzuca?',
+      leftG: ['adam_mickiewicz_pan_tadeusz_sp','henryk_sienkiewicz_potop_fragmenty','w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty','adam_mickiewicz_dziady_cz_ii_sp'],
+      rightG: ['witold_gombrowicz_ferdydurke_fragmenty','s_awomir_mrozek_tango','george_orwell_rok_1984'],
+      centerG: ['stanis_aw_wyspianski_wesele','stefan_zeromski_przedwiosnie'],
+    },
+    {
+      left: 'idealizm', right: 'realizm / pragmatyzm',
+      desc: 'Czy bohater kieruje się ideałami, czy trzeźwością?',
+      leftG: ['boles_aw_prus_lalka','stefan_zeromski_przedwiosnie','adam_mickiewicz_dziady_cz_iii'],
+      rightG: ['ignacy_krasicki_satyra_lo','molier_skapiec','ignacy_krasicki_bajki_sp'],
+      centerG: ['albert_camus_dzuma','fiodor_dostojewski_zbrodnia_i_kara'],
+    },
+    {
+      left: 'intymność / jednostkowe', right: 'zbiorowe / narodowe',
+      desc: 'Jaka skala dominuje — los jednego człowieka czy narodu?',
+      leftG: ['molier_skapiec','biblia_ksiega_hioba','fiodor_dostojewski_zbrodnia_i_kara','lament_swietokrzyski_fragmenty'],
+      rightG: ['adam_mickiewicz_dziady_cz_iii','henryk_sienkiewicz_potop_fragmenty','stanis_aw_wyspianski_wesele','adam_mickiewicz_pan_tadeusz_sp'],
+      centerG: ['boles_aw_prus_lalka','albert_camus_dzuma'],
+    },
+    {
+      left: 'miasto', right: 'wieś / natura',
+      desc: 'W jakim środowisku toczy się akcja?',
+      leftG: ['fiodor_dostojewski_zbrodnia_i_kara','boles_aw_prus_lalka','albert_camus_dzuma','george_orwell_rok_1984','marek_nowakowski_gora_edek'],
+      rightG: ['w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty','adam_mickiewicz_pan_tadeusz_sp','andrzej_stasiuk_miejsce'],
+      centerG: ['stanis_aw_wyspianski_wesele','stefan_zeromski_przedwiosnie'],
+    },
+    {
+      left: 'przemiana bohatera', right: 'brak przemiany',
+      desc: 'Czy bohater zmienia się w trakcie utworu?',
+      leftG: ['fiodor_dostojewski_zbrodnia_i_kara','william_szekspir_makbet','henryk_sienkiewicz_potop_fragmenty','stefan_zeromski_przedwiosnie'],
+      rightG: ['tadeusz_borowski_prosze_panstwa_do_gazu','george_orwell_rok_1984','molier_skapiec'],
+      centerG: ['boles_aw_prus_lalka','albert_camus_dzuma'],
+    },
+    {
+      left: 'cierpienie sensowne / odkupujące', right: 'cierpienie bezsensowne',
+      desc: 'Czy cierpienie bohatera ma sens lub cel?',
+      leftG: ['biblia_ksiega_hioba','lament_swietokrzyski_fragmenty','fiodor_dostojewski_zbrodnia_i_kara','adam_mickiewicz_dziady_cz_iii'],
+      rightG: ['tadeusz_borowski_prosze_panstwa_do_gazu','albert_camus_dzuma','gustaw_herling_grudzinski_inny_swiat_fragmenty'],
+      centerG: ['biblia_ksiega_koheleta','sofokles_antygona'],
+    },
+  ];
+
+  const axis = rnd(AXES);
+  // pick a work that clearly belongs to one side
+  const allSided = [
+    ...axis.leftG.map(id => ({ id, side: 'left' })),
+    ...axis.rightG.map(id => ({ id, side: 'right' })),
+    ...axis.centerG.map(id => ({ id, side: 'center' })),
+  ];
+  const pick = rnd(allSided);
+  const work = { id: pick.id, ...LEKTURY_DATA[pick.id] };
+  return { axis, work, correctSide: pick.side };
+}
+
+
+function genConstellation() {
+  const EPOCH_GROUPS_ANCIENT = ['biblia_ksiega_rodzaju','biblia_ksiega_hioba','biblia_ksiega_koheleta',
+    'biblia_ksiega_psalmow','biblia_apokalipsa_sw_jana','homer_iliada_fragmenty',
+    'sofokles_antygona','piesn_o_rolandzie_fragmenty','lament_swietokrzyski_fragmenty',
+    'rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty'];
+
+  const motif = rnd(MOTIFS_ACTIVE.filter(m => m.g.length >= 2 && m.g.length <= 6));
+  const allCorrectIds = motif.g;
+  const allCorrectWorks = allCorrectIds
+    .map(id => LEKTURY_DATA[id] ? { id, ...LEKTURY_DATA[id] } : null)
+    .filter(Boolean);
+
+  const wrongAll = shuffle(WORKS.filter(w => !allCorrectIds.includes(w.id) && !motif.p.includes(w.id)));
+  let ancientCount = 0;
+  const wrongWorks = [];
+  for (const w of wrongAll) {
+    const isAncient = EPOCH_GROUPS_ANCIENT.includes(w.id);
+    if (isAncient && ancientCount >= 2) continue;
+    if (isAncient) ancientCount++;
+    wrongWorks.push(w);
+    if (wrongWorks.length >= 6) break;
+  }
+
+  const poolCorrect = shuffle(allCorrectWorks).slice(0, Math.min(3, allCorrectWorks.length));
+  const poolWrong = wrongWorks.slice(0, 9 - poolCorrect.length);
+  const pool = shuffle([...poolCorrect, ...poolWrong]);
+  const correctIds = allCorrectIds.filter(id => pool.some(w => w.id === id));
+  return { motif, correctIds, allCorrectIds, pool };
+}
+
+function genChrono(n = 5) {
+  // Kolejność epok do wyświetlenia jako przyciski
+  const EPOCH_ORDER = [
+    'Starożytność',
+    'Średniowiecze',
+    'Renesans',
+    'Barok',
+    'Oświecenie',
+    'Romantyzm',
+    'Pozytywizm',
+    'Młoda Polska',
+    'Dwudziestolecie',
+    'Wojna i okupacja (1939–1945)',
+    'Współczesność 1945–1989',
+    'Współczesność po 1989',
+  ];
+
+  // Podstawowe przypisanie epoki
+  const WORK_EPOCHS = {
+    'biblia_ksiega_rodzaju':'Starożytność','biblia_ksiega_hioba':'Starożytność',
+    'biblia_ksiega_koheleta':'Starożytność','biblia_ksiega_psalmow':'Starożytność',
+    'biblia_apokalipsa_sw_jana':'Starożytność','homer_iliada_fragmenty':'Starożytność',
+    'sofokles_antygona':'Starożytność',
+    'piesn_o_rolandzie_fragmenty':'Średniowiecze',
+    'lament_swietokrzyski_fragmenty':'Średniowiecze',
+    'rozmowa_mistrza_polikarpa_ze_smiercia_fragmenty':'Średniowiecze',
+    'william_szekspir_makbet':'Renesans',
+    'molier_skapiec':'Barok',
+    'ignacy_krasicki_bajki_sp':'Oświecenie','ignacy_krasicki_satyra_lo':'Oświecenie',
+    'adam_mickiewicz_ballady_w_tym_romantycznosc_lo':'Romantyzm',
+    'adam_mickiewicz_dziady_cz_ii_sp':'Romantyzm',
+    'adam_mickiewicz_dziady_cz_iii':'Romantyzm',
+    'adam_mickiewicz_pan_tadeusz_sp':'Romantyzm',
+    'aleksander_fredro_zemsta_sp':'Romantyzm',
+    'juliusz_s_owacki_balladyna_sp':'Romantyzm',
+    'fiodor_dostojewski_zbrodnia_i_kara':'Pozytywizm',
+    'henryk_sienkiewicz_potop_fragmenty':'Pozytywizm',
+    'boles_aw_prus_lalka':'Pozytywizm',
+    'stanis_aw_wyspianski_wesele':'Młoda Polska',
+    'w_adys_aw_stanis_aw_reymont_ch_opi_fragmenty':'Młoda Polska',
+    'jan_parandowski_mitologia_cz_i_grecja':'Dwudziestolecie',
+    'stefan_zeromski_przedwiosnie':'Dwudziestolecie',
+    'witold_gombrowicz_ferdydurke_fragmenty':'Dwudziestolecie',
+    // Lektury wojenne — podstawowa odpowiedź to "Wojna i okupacja"
+    'tadeusz_borowski_prosze_panstwa_do_gazu':'Wojna i okupacja (1939–1945)',
+    'gustaw_herling_grudzinski_inny_swiat_fragmenty':'Wojna i okupacja (1939–1945)',
+    'hanna_krall_zdazyc_przed_panem_bogiem':'Wojna i okupacja (1939–1945)',
+    // Pozostałe współczesne 1945-1989
+    'albert_camus_dzuma':'Współczesność 1945–1989',
+    'george_orwell_rok_1984':'Współczesność 1945–1989',
+    's_awomir_mrozek_tango':'Współczesność 1945–1989',
+    'marek_nowakowski_gora_edek':'Współczesność 1945–1989',
+    'ryszard_kapuscinski_podroze_z_herodotem_fragmenty':'Współczesność 1945–1989',
+    // Współczesność po 1989
+    'andrzej_stasiuk_miejsce':'Współczesność po 1989',
+    'olga_tokarczuk_profesor_andrews_w_warszawie':'Współczesność po 1989',
+  };
+
+  // Alternatywne akceptowane odpowiedzi (lektury wojenne akceptują też "Współczesność 1945-1989")
+  const WORK_EPOCHS_ALT = {
+    'tadeusz_borowski_prosze_panstwa_do_gazu':'Współczesność 1945–1989',
+    'gustaw_herling_grudzinski_inny_swiat_fragmenty':'Współczesność 1945–1989',
+    'hanna_krall_zdazyc_przed_panem_bogiem':'Współczesność 1945–1989',
+  };
+
+  const items = shuffle(WORKS_WITH_MOTIFS.filter(w => WORK_EPOCHS[w.id])).slice(0, n);
+  return { items, epochMap: WORK_EPOCHS, epochAlt: WORK_EPOCHS_ALT, epochOrder: EPOCH_ORDER };
+}
+
+// ═══════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════
+
+const SK = 'kl_v2';
+const DEF = { xp:0, level:1, streak:0, sessions:0, totalCorrect:0, totalAnswered:0, mastery:{}, onboardingDone:false, nickname:'Maturzysta', settings:{} };
+const loadS = () => { try { const r=localStorage.getItem(SK); return r?JSON.parse(r):null; } catch{return null;} };
+const saveS = s => { try { localStorage.setItem(SK, JSON.stringify(s)); } catch{} };
+const calcLevel = xp => Math.floor(xp/100)+1;
+
+// ═══════════════════════════════════════════════
+// DESIGN
+// ═══════════════════════════════════════════════
+
+const C = {
+  primary:'#534AB7', pLight:'#EEEDFE', pDark:'#3C3489',
+  teal:'#0F6E56', tLight:'#E1F5EE',
+  coral:'#D85A30', cLight:'#FAECE7',
+  amber:'#BA7517', aLight:'#FAEEDA',
+  surf:'#ffffff', bg:'#f5f5f2',
+  brd:'rgba(0,0,0,0.1)',
+  text:'#1a1a1a', muted:'#666',
+};
+
+const mkBtn = (v='primary', extra={}) => ({
+  display:'block', width:'100%', padding:'13px 16px', borderRadius:12, fontWeight:500, fontSize:15,
+  cursor:'pointer', border:'none', transition:'opacity 0.15s',
+  background: v==='primary'?C.primary:v==='teal'?C.teal:v==='coral'?C.coral:v==='ghost'?'transparent':C.bg,
+  color: ['primary','teal','coral'].includes(v)?'#fff':C.text,
+  ...(v==='ghost'?{border:`1px solid ${C.brd}`}:{}), ...extra,
+});
+
+const mkCard = (extra={}) => ({ background:C.surf, borderRadius:14, border:`0.5px solid ${C.brd}`, padding:'14px 16px', ...extra });
+const center = { textAlign:'center' };
+const row = (extra={}) => ({ display:'flex', alignItems:'center', gap:10, ...extra });
+
+function Hdr({ title, onBack, right }) {
+  return <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.surf, borderBottom:`0.5px solid ${C.brd}`, position:'sticky', top:0, zIndex:20 }}>
+    {onBack && <button onClick={onBack} style={{ fontSize:22, color:C.text, padding:'2px 6px' }}>←</button>}
+    <span style={{ flex:1, fontSize:16, fontWeight:500 }}>{title}</span>
+    {right}
+  </div>;
+}
+
+function PBar({ pct, color=C.primary }) {
+  return <div style={{ height:5, background:C.pLight }}>
+    <div style={{ width:`${Math.min(100,Math.max(0,pct))}%`, height:'100%', background:color, transition:'width 0.4s ease', borderRadius:'0 3px 3px 0' }} />
+  </div>;
+}
+
+function GameHeader({ idx, total, scoreDisp, correct, wrong, color=C.primary, label='' }) {
+  return <div style={{ padding:'10px 16px 8px', background:C.surf, borderBottom:`0.5px solid ${C.brd}` }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
+      <span style={{ fontSize:13, color:C.muted }}>{label && <span style={{ fontWeight:500, color }}>{label} · </span>}{idx+1} / {total}</span>
+      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <span style={{ fontSize:13, fontWeight:600, color:C.teal }}>✓ {correct}</span>
+        <span style={{ fontSize:13, fontWeight:600, color:C.coral }}>✗ {wrong}</span>
+        {scoreDisp !== undefined && <span style={{ fontSize:12, fontWeight:500, color, background: color==='#BA7517'?'#FAEEDA':C.pLight, padding:'2px 8px', borderRadius:6 }}>{scoreDisp} pkt</span>}
+      </div>
+    </div>
+    <div style={{ height:6, background:C.pLight, borderRadius:3 }}>
+      <div style={{ width:`${Math.min(100,Math.max(0,(idx/total)*100))}%`, height:'100%', background:color, borderRadius:3, transition:'width 0.4s ease' }} />
+    </div>
+  </div>;
+}
+
+function XpBar({ xp, level }) {
+  const pct = xp % 100;
+  return <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+    <span style={{ fontSize:12, color:C.muted, minWidth:52 }}>Poz. {level}</span>
+    <div style={{ flex:1, height:6, background:C.pLight, borderRadius:4 }}>
+      <div style={{ width:`${pct}%`, height:'100%', background:C.primary, borderRadius:4, transition:'width 0.5s' }} />
+    </div>
+    <span style={{ fontSize:12, color:C.muted, minWidth:32 }}>{pct}/100</span>
+  </div>;
+}
+
+function Badge({ text, color=C.primary, bg=C.pLight }) {
+  return <span style={{ fontSize:11, fontWeight:500, padding:'3px 8px', borderRadius:6, background:bg, color }}>{text}</span>;
+}
+
+function Toast({ msg, ok }) {
+  return <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+    background:ok?C.teal:C.coral, color:'#fff', padding:'10px 22px', borderRadius:12, fontSize:14, fontWeight:500,
+    maxWidth:360, textAlign:center.textAlign, zIndex:200, animation:'fadeInUp 0.25s ease',
+    boxShadow:'0 4px 20px rgba(0,0,0,0.18)', pointerEvents:'none' }}>
+    {ok ? '✓ ' : '✗ '}{msg}
+  </div>;
+}
+
+function Stat({ label, value, color=C.primary }) {
+  return <div style={{ background:C.surf, borderRadius:12, border:`0.5px solid ${C.brd}`, padding:'10px 8px', textAlign:'center' }}>
+    <p style={{ fontSize:20, fontWeight:500, color }}>{value}</p>
+    <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{label}</p>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════
+// SCREENS
+// ═══════════════════════════════════════════════
+
+function StartScreen({ state, onStart, onGuest }) {
+  return <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:28, gap:28 }}>
+    <div style={center}>
+      <div style={{ fontSize:52, marginBottom:10, animation:'pulse 3s infinite' }}>✦</div>
+      <h1 style={{ fontSize:30, fontWeight:500, marginBottom:8 }}>Konstelacje</h1>
+      <p style={{ fontSize:15, color:C.muted }}>Powtórka lektur i motywów · matura z polskiego</p>
+      <p style={{ fontSize:12, color:C.muted, marginTop:6 }}>{WORKS.length} lektur · {MOTIFS_ACTIVE.length} motywów</p>
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <button style={mkBtn('primary')} onClick={() => onStart('new')}>Zacznij naukę</button>
+      {state.sessions > 0 && <button style={mkBtn('ghost')} onClick={() => onStart('continue')}>Kontynuuj — {state.nickname} · Poz. {state.level}</button>}
+      <button style={mkBtn('ghost')} onClick={onGuest}>Tryb gościa (bez zapisu)</button>
+    </div>
+    <p style={{ ...center, fontSize:13, color:C.muted }}>5–10 minut dziennie · offline · dane z matrycy motywów v1.0</p>
+  </div>;
+}
+
+function OnboardingScreen({ onDone }) {
+  const [step, setStep] = useState(0);
+  const [lvl, setLvl] = useState(null);
+  const STEPS = [
+    { icon:'📚', title:'Lektury i motywy', body:`Pracujesz z ${WORKS.length} lekturami obowiązkowymi i ${MOTIFS_ACTIVE.length} motywami literackimi. Dane z weryfikowanej matrycy.` },
+    { icon:'⚡', title:'5 trybów gry', body:'Szybkie dopasowanie, Sieć skojarzeń, Skala interpretacji, Konstelacje, Chronologia. Każdy tryb ćwiczy inny rodzaj myślenia.' },
+    { icon:'🧭', title:'Twój postęp', body:'Gra zapamiętuje, które lektury i motywy mylisz. Im więcej grasz, tym celniej pokazuje słabe punkty.' },
+  ];
+  if (step < 3) {
+    const s = STEPS[step];
+    return <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:28, gap:24 }}>
+      <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+        {STEPS.map((_,i) => <div key={i} style={{ width:i===step?28:8, height:6, borderRadius:3, background:i===step?C.primary:C.brd, transition:'all 0.3s' }} />)}
+      </div>
+      <div style={center}>
+        <div style={{ fontSize:52, marginBottom:16 }}>{s.icon}</div>
+        <h2 style={{ fontSize:20, fontWeight:500, marginBottom:12 }}>{s.title}</h2>
+        <p style={{ fontSize:15, color:C.text, lineHeight:1.65 }}>{s.body}</p>
+      </div>
+      <button style={mkBtn('primary')} onClick={() => setStep(i=>i+1)}>{step<2?'Dalej →':'Wybierz poziom →'}</button>
+    </div>;
+  }
+  return <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:28, gap:14 }}>
+    <div style={{ ...center, marginBottom:4 }}>
+      <h2 style={{ fontSize:20, fontWeight:500, marginBottom:6 }}>Gdzie jesteś?</h2>
+      <p style={{ fontSize:14, color:C.muted }}>Gra dopasuje trudność pytań.</p>
+    </div>
+    {[['easy','Jestem na początku','Zaczynamy od prostszych pytań'],['med','Średnio pamiętam','Mix trudności'],['hard','Szybko kojarzę','Od razu trudniejsze']].map(([id,l,s]) => (
+      <div key={id} onClick={() => setLvl(id)} style={{ ...mkCard(), cursor:'pointer', border:lvl===id?`2px solid ${C.primary}`:`0.5px solid ${C.brd}`, background:lvl===id?C.pLight:C.surf }}>
+        <p style={{ fontWeight:500, fontSize:15, color:lvl===id?C.primary:C.text }}>{l}</p>
+        <p style={{ fontSize:13, color:C.muted, marginTop:2 }}>{s}</p>
+      </div>
+    ))}
+    <button style={{ ...mkBtn('primary'), opacity:lvl?1:0.45, marginTop:8 }} disabled={!lvl} onClick={() => onDone(lvl)}>Zaczynajmy ✦</button>
+  </div>;
+}
+
+const MODES = [
+  { id:'match_motyw', label:'Motyw do lektury', icon:'⚡', desc:'Wybierz pasujący motyw', time:'2 min' },
+  { id:'match_lektura', label:'Lektura do motywu', icon:'📖', desc:'Wybierz pasującą lekturę', time:'2 min' },
+  { id:'network', label:'Sieć skojarzeń', icon:'🕸', desc:'Zaznacz wszystkie lektury z motywem', time:'3 min' },
+  { id:'scale', label:'Skala interpretacji', icon:'⚖', desc:'Umieść lekturę na osi znaczeń', time:'3 min' },
+  { id:'constellation', label:'Konstelacje', icon:'✦', desc:'Wybierz lektury do motywu', time:'4 min' },
+  { id:'chrono', label:'Chronologia', icon:'🕐', desc:'Przyporządkuj do epok', time:'2 min' },
+];
+
+function DashboardScreen({ state, onPlay, onReview, onProfile, onSettings }) {
+  const acc = state.totalAnswered>0 ? Math.round(state.totalCorrect/state.totalAnswered*100) : 0;
+  const weak = Object.entries(state.mastery)
+    .filter(([,v]) => v.total >= 2 && v.correct/v.total < 0.65)
+    .map(([id,v]) => ({ item: LEKTURY_DATA[id] || MOTYWY_DATA[id], acc: Math.round(v.correct/v.total*100), id }))
+    .filter(x => x.item).sort((a,b)=>a.acc-b.acc).slice(0,3);
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.surf, borderBottom:`0.5px solid ${C.brd}`, position:'sticky', top:0, zIndex:20 }}>
+      <div style={{ flex:1 }}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:3 }}>Hej, {state.nickname}</p>
+        <XpBar xp={state.xp} level={state.level} />
+      </div>
+      <button onClick={onProfile} style={{ fontSize:20, padding:4 }}>👤</button>
+      <button onClick={onSettings} style={{ fontSize:20, padding:4 }}>⚙️</button>
+    </div>
+
+    <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 32px', display:'flex', flexDirection:'column', gap:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+        <Stat label="Seria" value={`${state.streak}d`} color={C.amber} />
+        <Stat label="Sesje" value={state.sessions} color={C.teal} />
+        <Stat label="Celność" value={`${acc}%`} color={C.primary} />
+      </div>
+
+      <div>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:10 }}>Zagraj teraz</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {MODES.slice(0,4).map(m => (
+            <button key={m.id} onClick={() => onPlay(m.id)} style={{ ...mkCard(), display:'flex', alignItems:'center', gap:12, textAlign:'left', cursor:'pointer' }}>
+              <span style={{ fontSize:24 }}>{m.icon}</span>
+              <div style={{ flex:1 }}>
+                <p style={{ fontWeight:500, fontSize:15 }}>{m.label}</p>
+                <p style={{ fontSize:12, color:C.muted, marginTop:1 }}>{m.desc} · {m.time}</p>
+              </div>
+              <span style={{ color:C.muted, fontSize:18 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:10 }}>Więcej trybów</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          {MODES.slice(4).map(m => (
+            <button key={m.id} onClick={() => onPlay(m.id)} style={{ ...mkCard(), textAlign:'center', cursor:'pointer', padding:'14px 10px' }}>
+              <div style={{ fontSize:24, marginBottom:6 }}>{m.icon}</div>
+              <p style={{ fontSize:13, fontWeight:500 }}>{m.label}</p>
+              <p style={{ fontSize:11, color:C.muted, marginTop:2 }}>{m.time}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {weak.length > 0 && <div>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:10 }}>Do powtórki</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {weak.map(({item, acc, id}) => (
+            <div key={id} style={{ ...mkCard(), display:'flex', alignItems:'center', gap:10 }}>
+              <span>⚠️</span>
+              <p style={{ flex:1, fontSize:14 }}>{item.title||item.label}</p>
+              <Badge text={`${acc}%`} color={C.coral} bg={C.cLight} />
+            </div>
+          ))}
+          <button style={mkBtn('ghost')} onClick={onReview}>Pełna lista słabych punktów →</button>
+        </div>
+      </div>}
+    </div>
+  </div>;
+}
+
+// ─── GAME MODES ─────────────────────────────────────────
+
+function FeedbackPanel({ ok, msg, correctLabel, allMotywy, onNext, isLast }) {
+  return <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+    <div style={{ ...mkCard(), background: ok ? C.tLight : C.cLight, borderLeft: `4px solid ${ok?C.teal:C.coral}` }}>
+      <p style={{ fontWeight:500, fontSize:15, color: ok?C.teal:C.coral, marginBottom:6 }}>
+        {ok ? '✓ Dobrze!' : '✗ Nie tym razem'}
+      </p>
+      <p style={{ fontSize:14, color: ok?C.teal:C.coral, lineHeight:1.5 }}>{msg}</p>
+    </div>
+    {allMotywy && allMotywy.length > 0 && <div style={{ ...mkCard(), background:C.bg }}>
+      <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>
+        Motywy główne tej lektury
+      </p>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        {allMotywy.map(m => <Badge key={m.id} text={m.label}
+          color={m.id===correctLabel?C.primary:C.muted}
+          bg={m.id===correctLabel?C.pLight:'rgba(0,0,0,0.05)'} />)}
+      </div>
+    </div>}
+    <button style={mkBtn('primary')} onClick={onNext}>
+      {isLast ? 'Zobacz wynik →' : 'Dalej →'}
+    </button>
+  </div>;
+}
+
+function MatchMode({ modeId, onDone, onMastery }) {
+  const isMotyw = modeId === 'match_motyw';
+  const [qs] = useState(() => isMotyw ? genMatchMotywDoLektury(9) : genMatchLekturaDoMotywu(9));
+  const [idx, setIdx] = useState(0);
+  // Use ref for score to avoid async state bug in onDone
+  const scoreRef = useRef(0);
+  const [scoreDisp, setScoreDisp] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [wrong, setWrong] = useState(0);
+  const [sel, setSel] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const q = qs[idx];
+  if (!q) return null;
+
+  const pick = (id) => {
+    if (sel) return;
+    setSel(id);
+    setRevealed(true);
+    // Poprawna = dowolny motyw/lektura z tablicy correctIds
+    const ok = q.correctIds.includes(id);
+    if (ok) { scoreRef.current += 1; setScoreDisp(scoreRef.current); setCorrect(n => n+1); }
+    else { setWrong(n => n+1); }
+    onMastery(isMotyw ? q.work.id : q.motif.id, ok);
+  };
+
+  const next = () => {
+    setSel(null); setRevealed(false);
+    if (idx + 1 >= qs.length) {
+      onDone({ score: scoreRef.current, total: qs.length, xpGained: scoreRef.current * 10, mode: modeId });
+    } else {
+      setIdx(i => i + 1);
+    }
+  };
+
+  const isOk = sel !== null && q.correctIds.includes(sel);
+
+  // Dla panelu feedbacku: pokazujemy motywy lektury lub lektury dla motywu
+  const correctWorkId = isMotyw ? q.work.id : q.shownCorrectId;
+  const correctMotifId = isMotyw ? q.shownCorrectId : q.motif?.id;
+  const correctWorkMotifs = (LEKTURY_DATA[correctWorkId]?.g || [])
+    .map(mid => ({ id: mid, label: MOTYWY_DATA[mid]?.label || mid }));
+
+  // Build feedback message
+  const feedbackMsg = () => {
+    if (isOk) return q.feedbackOk;
+    return q.feedbackBlad;
+  };
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <GameHeader idx={idx} total={qs.length} scoreDisp={scoreDisp} correct={correct} wrong={wrong} label={isMotyw?'Motyw do lektury':'Lektura do motywu'} />
+    <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+
+        {isMotyw
+          ? <div style={{ ...mkCard(), background:C.pLight }}>
+              <p style={{ fontSize:11, fontWeight:500, color:C.primary, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Lektura</p>
+              <p style={{ fontSize:20, fontWeight:500, color:C.primary }}>{q.work.title}</p>
+              <p style={{ fontSize:12, color:C.primary, opacity:0.7, marginTop:4 }}>Który motyw jest w niej główny?</p>
+            </div>
+          : <div style={{ ...mkCard(), background:C.tLight }}>
+              <p style={{ fontSize:11, fontWeight:500, color:C.teal, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Motyw</p>
+              <p style={{ fontSize:20, fontWeight:500, color:C.teal }}>{q.motif.label}</p>
+              <p style={{ fontSize:12, color:C.teal, opacity:0.7, marginTop:4 }}>Która lektura ma ten motyw jako główny?</p>
+            </div>
+        }
+
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {q.options.map(opt => {
+            const id = opt.id;
+            const isCorrect = revealed && q.correctIds.includes(id);
+            const isWrong = revealed && sel === id && !isCorrect;
+            return <button key={id} onClick={() => pick(id)} disabled={!!sel} style={{
+              textAlign:'left', padding:'13px 16px', borderRadius:12,
+              cursor: sel ? 'default' : 'pointer',
+              background: isCorrect ? C.tLight : isWrong ? C.cLight : C.surf,
+              border: isCorrect ? `2px solid ${C.teal}` : isWrong ? `2px solid ${C.coral}` : `0.5px solid ${C.brd}`,
+              color: isCorrect ? C.teal : isWrong ? C.coral : C.text,
+              fontWeight: isCorrect ? 600 : 500, fontSize:14, transition:'all 0.2s',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+            }}>
+              <span>{isMotyw ? opt.label : opt.title}</span>
+              {isCorrect && <span style={{ fontSize:16 }}>✓</span>}
+              {isWrong && <span style={{ fontSize:16 }}>✗</span>}
+            </button>;
+          })}
+        </div>
+      </div>
+
+      {revealed && <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ ...mkCard(), background: isOk?C.tLight:C.cLight, borderLeft:`4px solid ${isOk?C.teal:C.coral}` }}>
+          <p style={{ fontWeight:500, fontSize:15, color:isOk?C.teal:C.coral, marginBottom:8 }}>
+            {isOk ? '✓ Dobrze!' : '✗ Nie tym razem'}
+          </p>
+          <p style={{ fontSize:14, color:isOk?C.teal:C.coral, lineHeight:1.55, marginBottom: correctWorkMotifs.length>0?10:0 }}>
+            {feedbackMsg()}
+          </p>
+          {correctWorkMotifs.length > 0 && <>
+            <p style={{ fontSize:11, fontWeight:500, color:isOk?C.teal:C.coral, opacity:0.75, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:6 }}>
+              Wszystkie motywy główne „{(LEKTURY_DATA[correctWorkId]?.title||'').replace(/^[^,]+,\s*/,'').split('(')[0].trim()}”:
+            </p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+              {correctWorkMotifs.map(m =>
+                <Badge key={m.id} text={m.label}
+                  color={m.id===correctMotifId ? (isOk?C.teal:C.coral) : C.muted}
+                  bg={m.id===correctMotifId ? (isOk?'rgba(15,110,86,0.12)':'rgba(216,90,48,0.1)') : 'rgba(0,0,0,0.05)'} />
+              )}
+            </div>
+          </>}
+        </div>
+        <button style={mkBtn('primary')} onClick={next}>
+          {idx+1 >= qs.length ? 'Zobacz wynik →' : 'Dalej →'}
+        </button>
+      </div>}
+    </div>
+  </div>;
+}
+
+function NetworkMode({ onDone, onMastery }) {
+  const [q] = useState(() => genNetwork());
+  const [sel, setSel] = useState([]);
+  const [done, setDone] = useState(false);
+  const [hits, setHits] = useState(0);
+  const MAX = Math.min(q.correctIds.length + 1, 6);
+
+  const toggle = id => {
+    if (done) return;
+    setSel(s => s.includes(id) ? s.filter(x=>x!==id) : s.length < MAX ? [...s,id] : s);
+  };
+
+  const submit = () => {
+    if (done || sel.length === 0) return;
+    const h = sel.filter(id => q.correctIds.includes(id)).length;
+    setHits(h);
+    setDone(true);
+    sel.forEach(id => onMastery(id, q.correctIds.includes(id)));
+    // also mark correct ones not selected as wrong
+    q.correctIds.forEach(id => { if (!sel.includes(id)) onMastery(id, false); });
+  };
+
+  const finish = () => {
+    const pct = Math.round(hits / Math.max(q.correctIds.length, 1) * 100);
+    onDone({ score: pct, total: 100, xpGained: Math.round(pct / 10), mode: 'network' });
+  };
+
+  const shortTitle = id => (LEKTURY_DATA[id]?.title || id).replace(/^[^,]+,\s*/, '').split('(')[0].trim();
+
+  const correctSelected = sel.filter(id => q.correctIds.includes(id)).length;
+  const wrongSelected = sel.filter(id => !q.correctIds.includes(id)).length;
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <div style={{ padding:'10px 16px 8px', background:C.surf, borderBottom:`0.5px solid ${C.brd}` }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
+        <span style={{ fontSize:13, fontWeight:500, color:C.teal }}>Sieć skojarzeń</span>
+        <div style={{ display:'flex', gap:8 }}>
+          <span style={{ fontSize:13, fontWeight:600, color:C.teal }}>✓ {correctSelected}</span>
+          <span style={{ fontSize:13, fontWeight:600, color:C.coral }}>✗ {wrongSelected}</span>
+          <span style={{ fontSize:12, color:C.muted }}>szukaj: {q.correctIds.length}</span>
+        </div>
+      </div>
+      <div style={{ height:6, background:C.tLight, borderRadius:3 }}>
+        <div style={{ width:`${Math.min(100, correctSelected/Math.max(q.correctIds.length,1)*100)}%`, height:'100%', background:C.teal, borderRadius:3, transition:'width 0.3s' }} />
+      </div>
+    </div>
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ ...mkCard(), background:C.tLight }}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.teal, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Motyw</p>
+        <p style={{ fontSize:20, fontWeight:500, color:C.teal }}>{q.motif.label}</p>
+        <p style={{ fontSize:13, color:C.teal, opacity:0.75, marginTop:2 }}>
+          Zaznacz wszystkie lektury, w których ten motyw jest <strong>główny</strong> (score 1)
+        </p>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+        {q.pool.map(w => {
+          const isSel = sel.includes(w.id);
+          const isCorrect = q.correctIds.includes(w.id);
+          const isOk = done && isCorrect;
+          const isErr = done && isSel && !isCorrect;
+          const isMissed = done && !isSel && isCorrect;
+          return <button key={w.id} onClick={() => toggle(w.id)} disabled={done} style={{
+            padding:'10px 6px', borderRadius:10, textAlign:'center', cursor: done?'default':'pointer',
+            background: isOk ? C.tLight : isErr ? C.cLight : isMissed ? C.aLight : isSel ? C.pLight : C.surf,
+            border: isOk ? `2px solid ${C.teal}` : isErr ? `2px solid ${C.coral}` : isMissed ? `2px solid ${C.amber}` : isSel ? `2px solid ${C.primary}` : `0.5px solid ${C.brd}`,
+            fontSize:11, fontWeight:500, lineHeight:1.4, transition:'all 0.2s',
+            color: isOk ? C.teal : isErr ? C.coral : isMissed ? C.amber : isSel ? C.primary : C.text,
+          }}>
+            {shortTitle(w.id)}
+            {isOk && <span style={{display:'block', fontSize:13}}>✓</span>}
+            {isErr && <span style={{display:'block', fontSize:13}}>✗</span>}
+            {isMissed && <span style={{display:'block', fontSize:13}}>!</span>}
+          </button>;
+        })}
+      </div>
+
+      {!done
+        ? <>
+            <button style={{ ...mkBtn('teal'), opacity:sel.length>0?1:0.4 }} disabled={sel.length===0} onClick={submit}>
+              Sprawdź zaznaczenie
+            </button>
+          </>
+        : <>
+            <div style={{ ...mkCard(), background: hits===q.correctIds.length ? C.tLight : hits>0 ? C.aLight : C.cLight }}>
+              <p style={{ fontSize:16, fontWeight:600, color: hits===q.correctIds.length?C.teal:hits>0?C.amber:C.coral, marginBottom:8 }}>
+                {hits}/{q.correctIds.length} poprawnych odpowiedzi
+              </p>
+              <p style={{ fontSize:12, fontWeight:500, color:C.muted, marginBottom:6 }}>Wszystkie lektury z motywem „{q.motif.label}" (wyniki główne):</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {q.correctIds.map(id => {
+                  const hit = sel.includes(id);
+                  return <span key={id} style={{ fontSize:12, padding:'3px 8px', borderRadius:6,
+                    background: hit?C.tLight:C.aLight, color: hit?C.teal:C.amber, fontWeight:500 }}>
+                    {hit?'✓ ':''}{shortTitle(id)}
+                  </span>;
+                })}
+              </div>
+            </div>
+            <button style={mkBtn('primary')} onClick={finish}>Dalej →</button>
+          </>
+      }
+    </div>
+  </div>;
+}
+
+function ScaleMode({ onDone, onMastery }) {
+  const [qs] = useState(() => Array.from({length:5}, genScale));
+  const [idx, setIdx] = useState(0);
+  const scoreRef = useRef(0);
+  const [scoreDisp, setScoreDisp] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [wrong, setWrong] = useState(0);
+  const [chosen, setChosen] = useState(null);
+  const q = qs[idx];
+  if (!q) return null;
+
+  const choose = side => {
+    if (chosen) return;
+    setChosen(side);
+    const ok = side === q.correctSide;
+    if (ok) { scoreRef.current += 1; setScoreDisp(scoreRef.current); setCorrect(n=>n+1); }
+    else setWrong(n=>n+1);
+    onMastery(q.work.id, ok);
+  };
+
+  const next = () => {
+    setChosen(null);
+    if (idx+1>=qs.length) onDone({ score: scoreRef.current, total:qs.length, xpGained:scoreRef.current*15, mode:'scale' });
+    else setIdx(i=>i+1);
+  };
+
+  const isOk = chosen === q.correctSide;
+
+  const oStyle = side => {
+    const isSel = chosen===side, isCorrect = q.correctSide===side;
+    return { flex:1, padding:'12px 6px', borderRadius:10, cursor:chosen?'default':'pointer', textAlign:'center', fontWeight:500, fontSize:13, transition:'all 0.2s',
+      background: chosen?(isCorrect?C.tLight:isSel?C.cLight:C.surf):C.surf,
+      border: chosen?(isCorrect?`2px solid ${C.teal}`:isSel?`2px solid ${C.coral}`:`0.5px solid ${C.brd}`):`0.5px solid ${C.brd}`,
+      color: chosen?(isCorrect?C.teal:isSel?C.coral:C.muted):C.text };
+  };
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <GameHeader idx={idx} total={qs.length} scoreDisp={scoreDisp} correct={correct} wrong={wrong} color={C.amber} label="Skala interpretacji" />
+    <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:16, display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{ ...mkCard(), background:C.pLight, textAlign:'center' }}>
+          <p style={{ fontSize:11, fontWeight:500, color:C.primary, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Lektura</p>
+          <p style={{ fontSize:18, fontWeight:500, color:C.primary }}>{q.work.title}</p>
+        </div>
+        <p style={{ fontSize:15, textAlign:'center' }}>Gdzie umieścisz tę lekturę na osi?</p>
+        <p style={{ fontSize:13, color:C.muted, textAlign:'center', fontStyle:'italic' }}>{q.axis.desc}</p>
+        <div style={{ ...mkCard(), background:C.bg }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+            <span style={{ fontSize:12, fontWeight:500, color:C.primary, minWidth:60 }}>{q.axis.left}</span>
+            <div style={{ flex:1, height:2, background:`linear-gradient(to right,${C.primary},${C.teal})`, borderRadius:1 }} />
+            <span style={{ fontSize:12, fontWeight:500, color:C.teal, minWidth:60, textAlign:'right' }}>{q.axis.right}</span>
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button style={oStyle('left')} onClick={() => choose('left')}>{q.axis.left}</button>
+            <button style={{ ...oStyle('center'), flex:0.7 }} onClick={() => choose('center')}>Środek</button>
+            <button style={oStyle('right')} onClick={() => choose('right')}>{q.axis.right}</button>
+          </div>
+        </div>
+      </div>
+      {chosen && <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ ...mkCard(), background:isOk?C.tLight:C.cLight, borderLeft:`4px solid ${isOk?C.teal:C.coral}` }}>
+          <p style={{ fontWeight:500, fontSize:15, color:isOk?C.teal:C.coral, marginBottom:6 }}>
+            {isOk ? '✓ Trafnie!' : '✗ Nie tym razem'}
+          </p>
+          <p style={{ fontSize:14, color:isOk?C.teal:C.coral, lineHeight:1.55, marginBottom:10 }}>
+            {isOk
+              ? `Ta lektura leży bliżej bieguna „${q.axis[chosen]}”. Dobrze rozpoznajesz tę oś.`
+              : q.correctSide==='center'
+                ? `Ta lektura jest po środku osi — nie da się jej jednoznacznie przypisać do żadnego bieguna.`
+                : `Ta lektura leży bliżej bieguna „${q.axis[q.correctSide]}”, nie „${q.axis[chosen]}”.`
+            }
+          </p>
+          <p style={{ fontSize:12, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:6 }}>
+            Główne motywy tej lektury:
+          </p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+            {(LEKTURY_DATA[q.work.id]?.g||[]).map(mid =>
+              <Badge key={mid} text={MOTYWY_DATA[mid]?.label||mid}
+                color={C.primary} bg={C.pLight} />
+            )}
+          </div>
+        </div>
+        <button style={mkBtn('primary')} onClick={next}>{idx+1>=qs.length?'Zobacz wynik →':'Dalej →'}</button>
+      </div>}
+    </div>
+  </div>;
+}
+
+function ConstellationMode({ onDone, onMastery }) {
+  const [q] = useState(() => genConstellation());
+  const [sel, setSel] = useState([]);
+  const [done, setDone] = useState(false);
+  const [hits, setHits] = useState(0);
+  const MAX_SEL = q.correctIds.length + 1;
+
+  const toggle = id => {
+    if (done) return;
+    setSel(s => s.includes(id) ? s.filter(x=>x!==id) : s.length<MAX_SEL ? [...s,id] : s);
+  };
+
+  const submit = () => {
+    if (done || sel.length===0) return;
+    const h = sel.filter(id=>q.correctIds.includes(id)).length;
+    setHits(h);
+    setDone(true);
+    sel.forEach(id => onMastery(id, q.correctIds.includes(id)));
+    q.correctIds.forEach(id => { if (!sel.includes(id)) onMastery(id, false); });
+  };
+
+  const finish = () => onDone({ score:hits, total:Math.max(q.correctIds.length,1), xpGained:hits*12, mode:'constellation' });
+  const shortT = id => (LEKTURY_DATA[id]?.title||id).replace(/^[^,]+,\s*/,'').split('(')[0].trim();
+
+  const correctSel = sel.filter(id => q.correctIds.includes(id)).length;
+  const wrongSel = sel.filter(id => !q.correctIds.includes(id)).length;
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <div style={{ padding:'10px 16px 8px', background:C.surf, borderBottom:`0.5px solid ${C.brd}` }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
+        <span style={{ fontSize:13, fontWeight:500, color:C.primary }}>Konstelacje</span>
+        <div style={{ display:'flex', gap:8 }}>
+          <span style={{ fontSize:13, fontWeight:600, color:C.teal }}>✓ {correctSel}</span>
+          <span style={{ fontSize:13, fontWeight:600, color:C.coral }}>✗ {wrongSel}</span>
+          <span style={{ fontSize:12, color:C.muted }}>szukaj: {q.correctIds.length}</span>
+        </div>
+      </div>
+      <div style={{ height:6, background:C.pLight, borderRadius:3 }}>
+        <div style={{ width:`${Math.min(100, (sel.filter(id=>q.correctIds.includes(id)).length)/Math.max(q.correctIds.length,1)*100)}%`, height:'100%', background:C.primary, borderRadius:3, transition:'width 0.3s' }} />
+      </div>
+    </div>
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ ...mkCard(), background:C.pLight }}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.primary, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Motyw konstelacji</p>
+        <p style={{ fontSize:20, fontWeight:500, color:C.primary }}>{q.motif.label}</p>
+        <p style={{ fontSize:13, color:C.primary, opacity:0.75, marginTop:2 }}>Wybierz lektury, w których ten motyw jest główny</p>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+        {q.pool.map(w => {
+          const isSel = sel.includes(w.id);
+          const isCorrect = q.correctIds.includes(w.id);
+          const isOk = done && isCorrect;
+          const isErr = done && isSel && !isCorrect;
+          const isMissed = done && !isSel && isCorrect;
+          return <button key={w.id} onClick={() => toggle(w.id)} disabled={done} style={{
+            padding:'10px 6px', borderRadius:10, textAlign:'center', cursor:done?'default':'pointer',
+            background: isOk?C.tLight:isErr?C.cLight:isMissed?C.aLight:isSel?C.pLight:C.surf,
+            border: isOk?`2px solid ${C.teal}`:isErr?`2px solid ${C.coral}`:isMissed?`2px solid ${C.amber}`:isSel?`2px solid ${C.primary}`:`0.5px solid ${C.brd}`,
+            fontSize:11, fontWeight:500, lineHeight:1.4, transition:'all 0.2s',
+            color: isOk?C.teal:isErr?C.coral:isMissed?C.amber:isSel?C.primary:C.text,
+          }}>
+            {shortT(w.id)}
+            {isOk && <span style={{display:'block',fontSize:13}}>✓</span>}
+            {isErr && <span style={{display:'block',fontSize:13}}>✗</span>}
+            {isMissed && <span style={{display:'block',fontSize:13}}>!</span>}
+          </button>;
+        })}
+      </div>
+      {!done
+        ? <>
+            <button style={{ ...mkBtn('primary'), opacity:sel.length>0?1:0.4 }} disabled={sel.length===0} onClick={submit}>Sprawdź ({sel.length}/{MAX})</button>
+          </>
+        : <>
+            <div style={{ ...mkCard(), background:hits>=q.correctIds.length?C.tLight:hits>0?C.aLight:C.cLight }}>
+              <p style={{ fontSize:16, fontWeight:600, color:hits>=q.correctIds.length?C.teal:hits>0?C.amber:C.coral, marginBottom:8 }}>
+                {hits}/{q.correctIds.length} trafnych
+              </p>
+              <p style={{ fontSize:12, fontWeight:500, color:C.muted, marginBottom:6 }}>Wszystkie lektury z motywem „{q.motif.label}” jako głównym:</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                {q.correctIds.map(id => {
+                  const hit = sel.includes(id);
+                  return <span key={id} style={{ fontSize:12, padding:'3px 8px', borderRadius:6,
+                    background:hit?C.tLight:C.aLight, color:hit?C.teal:C.amber, fontWeight:500 }}>
+                    {hit?'✓ ':''}{shortT(id)}
+                  </span>;
+                })}
+              </div>
+            </div>
+            <button style={mkBtn('primary')} onClick={finish}>Dalej →</button>
+          </>
+      }
+    </div>
+  </div>;
+}
+
+function ChronoMode({ onDone }) {
+  const [data] = useState(() => genChrono(5));
+  const { items, epochMap, epochAlt, epochOrder } = data;
+  const [asgn, setAsgn] = useState({});
+  const [done, setDone] = useState(false);
+  const [correct, setCorrect] = useState(0);
+
+  const assign = (id, ep) => { if (!done) setAsgn(a => ({...a,[id]:ep})); };
+
+  // Odpowiedź poprawna jeśli = epochMap (podstawowa) LUB epochAlt (alternatywna)
+  const isAnswerOk = (id, answer) =>
+    answer === epochMap[id] || (epochAlt[id] && answer === epochAlt[id]);
+
+  const submit = () => {
+    if (done) return;
+    let c = 0;
+    items.forEach(w => { if (isAnswerOk(w.id, asgn[w.id])) c++; });
+    setCorrect(c); setDone(true);
+  };
+
+  const allDone = items.every(w => asgn[w.id]);
+  const assigned = Object.keys(asgn).length;
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <div style={{ padding:'10px 16px 8px', background:C.surf, borderBottom:`0.5px solid ${C.brd}` }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
+        <span style={{ fontSize:13, fontWeight:500, color:C.amber }}>Chronologia</span>
+        <span style={{ fontSize:13, color:C.muted }}>Przypisano: <strong style={{ color:C.amber }}>{assigned}</strong> / {items.length}</span>
+      </div>
+      <div style={{ height:6, background:C.aLight, borderRadius:3 }}>
+        <div style={{ width:`${Math.min(100, assigned/items.length*100)}%`, height:'100%', background:C.amber, borderRadius:3, transition:'width 0.3s' }} />
+      </div>
+    </div>
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{ ...mkCard(), background:C.aLight }}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.amber, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Chronologia</p>
+        <p style={{ fontSize:14, color:C.amber }}>Przyporządkuj każdą lekturę do jej epoki literackiej</p>
+      </div>
+      {items.map(w => {
+        const a = asgn[w.id];
+        const ep = epochMap[w.id];
+        const epAlt = epochAlt[w.id];
+        const ok = done && isAnswerOk(w.id, a);
+        const err = done && a && !isAnswerOk(w.id, a);
+        return <div key={w.id} style={{ ...mkCard(), border:ok?`2px solid ${C.teal}`:err?`2px solid ${C.coral}`:`0.5px solid ${C.brd}` }}>
+          <p style={{ fontWeight:500, fontSize:13, marginBottom:8 }}>{w.title}</p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+            {epochOrder.map(ep2 => (
+              <button key={ep2} onClick={() => assign(w.id, ep2)} style={{
+                fontSize:11, fontWeight:500, padding:'4px 8px', borderRadius:6, cursor: done?'default':'pointer',
+                background: a===ep2 ? (ok?C.teal:err?C.coral:C.amber) : C.aLight,
+                color: a===ep2 ? '#fff' : C.amber,
+                border:'none', transition:'all 0.15s',
+              }}>{ep2}</button>
+            ))}
+          </div>
+          {done && <p style={{ fontSize:12, marginTop:8, color:ok?C.teal:C.coral, lineHeight:1.5 }}>
+            {ok
+              ? `✓ Poprawnie${epAlt && a===epAlt ? ` (także akceptowane: „${ep}”)` : ''}`
+              : epAlt
+                ? `✗ Poprawne: „${ep}” lub „${epAlt}”`
+                : `✗ Poprawna epoka: „${ep}”`
+            }
+          </p>}
+        </div>;
+      })}
+      {!done && <button style={{ ...mkBtn('primary'), opacity:allDone?1:0.4 }} disabled={!allDone} onClick={submit}>Sprawdź</button>}
+      {done && <>
+        <div style={{ ...mkCard(), textAlign:'center', background:correct>=Math.ceil(items.length*0.6)?C.tLight:C.aLight }}>
+          <p style={{ fontSize:20, fontWeight:500, color:correct>=Math.ceil(items.length*0.6)?C.teal:C.amber }}>{correct}/{items.length} poprawnych</p>
+          <p style={{ fontSize:13, color:C.muted, marginTop:4 }}>Przejrzyj wyniki powyżej, potem kliknij Dalej</p>
+        </div>
+        <button style={mkBtn('primary')} onClick={() => onDone({ score:correct, total:items.length, xpGained:correct*8, mode:'chrono' })}>Dalej →</button>
+      </>}
+    </div>
+  </div>;
+}
+
+function ResultScreen({ result, onAgain, onReview, onDash }) {
+  const pct = result.total > 0 ? Math.round(result.score/result.total*100) : result.score;
+  const ok = pct >= 60;
+  const mode = MODES.find(m=>m.id===result.mode);
+  return <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:28, gap:20, className:'slide-in' }}>
+    <div style={center}>
+      <div style={{ fontSize:52, marginBottom:10 }}>{ok?'🎉':'📖'}</div>
+      {mode && <p style={{ fontSize:12, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>{mode.label}</p>}
+      <p style={{ fontSize:42, fontWeight:500, color:ok?C.teal:C.coral }}>{pct}{result.total===100?'%':''}</p>
+      <p style={{ fontSize:15, color:C.muted }}>{result.total===100?`${pct}% trafność`:`${result.score} / ${result.total} poprawnych`}</p>
+    </div>
+    <div style={{ ...mkCard(), background:C.pLight, textAlign:'center' }}>
+      <p style={{ fontSize:12, fontWeight:500, color:C.primary, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Zdobyto XP</p>
+      <p style={{ fontSize:30, fontWeight:500, color:C.primary }}>+{result.xpGained} XP</p>
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <button style={mkBtn('primary')} onClick={onAgain}>Zagraj jeszcze raz</button>
+      <button style={mkBtn('teal')} onClick={onReview}>Do powtórki →</button>
+      <button style={mkBtn('ghost')} onClick={onDash}>← Dashboard</button>
+    </div>
+  </div>;
+}
+
+function ReviewScreen({ state, onBack, onPlay }) {
+  const items = Object.entries(state.mastery)
+    .filter(([,v]) => v.total > 0)
+    .map(([id,v]) => {
+      const item = LEKTURY_DATA[id] || MOTYWY_DATA[id];
+      return item ? { id, label: item.title||item.label, acc: Math.round(v.correct/v.total*100), total:v.total } : null;
+    })
+    .filter(Boolean).sort((a,b)=>a.acc-b.acc);
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <Hdr title="Do powtórki" onBack={onBack} />
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:10 }}>
+      {items.length === 0
+        ? <div style={{ textAlign:'center', paddingTop:60 }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>✦</div>
+            <p style={{ fontSize:15, color:C.text }}>Zagraj kilka rund, żeby tu zobaczyć swoje słabe punkty.</p>
+          </div>
+        : <>
+            {items.map(item => (
+              <div key={item.id} style={{ ...mkCard(), display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontWeight:500, fontSize:14 }}>{item.label}</p>
+                  <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{item.total} prób</p>
+                </div>
+                <p style={{ fontSize:18, fontWeight:500, color:item.acc<50?C.coral:item.acc<75?C.amber:C.teal }}>{item.acc}%</p>
+              </div>
+            ))}
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
+              <button style={mkBtn('primary')} onClick={() => onPlay('match_motyw')}>Powtórka: motyw do lektury</button>
+              <button style={mkBtn('teal')} onClick={() => onPlay('network')}>Powtórka: sieć skojarzeń</button>
+            </div>
+          </>
+      }
+    </div>
+  </div>;
+}
+
+function ProfileScreen({ state, onBack }) {
+  const acc = state.totalAnswered>0 ? Math.round(state.totalCorrect/state.totalAnswered*100) : 0;
+  const mastered = Object.values(state.mastery).filter(v=>v.total>=3&&v.correct/v.total>=0.8).length;
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <Hdr title="Profil" onBack={onBack} />
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ ...mkCard(), textAlign:'center', paddingTop:24, paddingBottom:24 }}>
+        <div style={{ width:64, height:64, borderRadius:'50%', background:C.pLight, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, margin:'0 auto 12px' }}>✦</div>
+        <p style={{ fontSize:18, fontWeight:500 }}>{state.nickname}</p>
+        <p style={{ fontSize:13, color:C.muted, marginTop:2 }}>Poziom {state.level}</p>
+        <div style={{ marginTop:14, maxWidth:280, margin:'14px auto 0' }}><XpBar xp={state.xp} level={state.level} /></div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        <Stat label="Sesje" value={state.sessions} />
+        <Stat label="Seria" value={`${state.streak}d`} color={C.amber} />
+        <Stat label="Celność" value={`${acc}%`} color={C.teal} />
+        <Stat label="Łączne XP" value={state.xp} />
+      </div>
+      <div style={mkCard()}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>Opanowane</p>
+        <p style={{ fontSize:22, fontWeight:500, color:C.teal }}>{mastered} / {WORKS.length + MOTIFS_ACTIVE.length}</p>
+        <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>lektur i motywów z ≥80% celnością (min. 3 próby)</p>
+      </div>
+      <div style={mkCard()}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:6 }}>Baza danych</p>
+        <p style={{ fontSize:13, color:C.text }}>{WORKS.length} lektur · {MOTIFS_ACTIVE.length} aktywnych motywów</p>
+        <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>Źródło: macierz_claude_game v1.0</p>
+      </div>
+    </div>
+  </div>;
+}
+
+function SettingsScreen({ state, onBack, onSave }) {
+  const [nick, setNick] = useState(state.nickname);
+  const Toggle = ({ v, set }) => <button onClick={()=>set(!v)} style={{ width:44,height:24,borderRadius:12,background:v?C.primary:C.brd,border:'none',cursor:'pointer',transition:'background 0.2s',position:'relative',flexShrink:0 }}>
+    <div style={{ position:'absolute',top:3,left:v?22:3,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'left 0.2s' }} />
+  </button>;
+  const [sound, setSound] = useState(state.settings?.sound||false);
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+    <Hdr title="Ustawienia" onBack={onBack} />
+    <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={mkCard()}>
+        <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>Pseudonim</p>
+        <input value={nick} onChange={e=>setNick(e.target.value)} style={{ width:'100%',padding:'10px 12px',borderRadius:8,border:`0.5px solid ${C.brd}`,fontSize:15,color:C.text,background:C.bg,outline:'none' }} placeholder="Wpisz pseudonim..." />
+      </div>
+      <div style={{ ...mkCard(), display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <p style={{ fontSize:15 }}>Dźwięki</p>
+        <Toggle v={sound} set={setSound} />
+      </div>
+      <button style={mkBtn('primary')} onClick={() => onSave({ nickname:nick, settings:{sound} })}>Zapisz zmiany</button>
+      <button style={{ ...mkBtn('ghost'), color:C.coral, border:`1px solid ${C.coral}` }}
+        onClick={() => { if(confirm('Zresetować cały postęp?')){ localStorage.removeItem(SK); location.reload(); } }}>
+        Reset postępu
+      </button>
+      <div style={{ ...mkCard(), background:C.pLight }}>
+        <p style={{ fontSize:12, color:C.primary, fontWeight:500, marginBottom:4 }}>Konstelacje Lektur v2.0</p>
+        <p style={{ fontSize:12, color:C.primary, opacity:0.8 }}>{WORKS.length} lektur · {MOTIFS_ACTIVE.length} motywów · 6 trybów gry · dane: macierz v1.0</p>
+      </div>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════
+
+function App() {
+  const [gs, setGs] = useState(() => ({ ...DEF, ...(loadS()||{}) }));
+  const [screen, setScreen] = useState('start');
+  const [activeMode, setActiveMode] = useState(null);
+  const [lastResult, setLastResult] = useState(null);
+  const isGuest = useRef(false);
+
+  useEffect(() => { if (!isGuest.current) saveS(gs); }, [gs]);
+
+  const updateMastery = useCallback((id, correct) => {
+    setGs(prev => {
+      const m = prev.mastery[id]||{correct:0,total:0};
+      return { ...prev,
+        mastery: { ...prev.mastery, [id]:{ correct:m.correct+(correct?1:0), total:m.total+1 } },
+        totalCorrect: prev.totalCorrect+(correct?1:0),
+        totalAnswered: prev.totalAnswered+1,
+      };
+    });
+  }, []);
+
+  const handleDone = useCallback(result => {
+    setLastResult(result);
+    setGs(prev => { const nx = prev.xp+result.xpGained; return { ...prev, xp:nx, level:calcLevel(nx), sessions:prev.sessions+1 }; });
+    setScreen('result');
+  }, []);
+
+  const goPlay = mode => { setActiveMode(mode); setScreen('game'); };
+
+  // key on activeMode forces remount only when mode changes, not on state updates
+  const gameKey = useRef(0);
+  const prevMode = useRef(null);
+  if (activeMode !== prevMode.current) { gameKey.current += 1; prevMode.current = activeMode; }
+
+  return <div style={{ flex:1, display:'flex', flexDirection:'column', width:'100%', maxWidth:480, minHeight:0, overflow:'hidden' }}>
+    {screen === 'start' && <StartScreen state={gs}
+      onStart={type => { if (type==='continue'||gs.onboardingDone) setScreen('dashboard'); else setScreen('onboarding'); }}
+      onGuest={() => { isGuest.current=true; setScreen('dashboard'); }} />}
+    {screen === 'onboarding' && <OnboardingScreen onDone={lvl => { setGs(s=>({...s,onboardingDone:true})); setScreen('dashboard'); }} />}
+    {screen === 'dashboard' && <DashboardScreen state={gs} onPlay={goPlay} onReview={()=>setScreen('review')} onProfile={()=>setScreen('profile')} onSettings={()=>setScreen('settings')} />}
+    {screen === 'game' && <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
+      <Hdr title={MODES.find(m=>m.id===activeMode)?.label||''} onBack={()=>setScreen('dashboard')} />
+      {activeMode==='match_motyw' && <MatchMode key={gameKey.current} modeId="match_motyw" onDone={handleDone} onMastery={updateMastery} />}
+      {activeMode==='match_lektura' && <MatchMode key={gameKey.current} modeId="match_lektura" onDone={handleDone} onMastery={updateMastery} />}
+      {activeMode==='network' && <NetworkMode key={gameKey.current} onDone={handleDone} onMastery={updateMastery} />}
+      {activeMode==='scale' && <ScaleMode key={gameKey.current} onDone={handleDone} onMastery={updateMastery} />}
+      {activeMode==='constellation' && <ConstellationMode key={gameKey.current} onDone={handleDone} onMastery={updateMastery} />}
+      {activeMode==='chrono' && <ChronoMode key={gameKey.current} onDone={handleDone} />}
+    </div>}
+    {screen === 'result' && lastResult && <ResultScreen result={lastResult} onAgain={()=>setScreen('game')} onReview={()=>setScreen('review')} onDash={()=>setScreen('dashboard')} />}
+    {screen === 'review' && <ReviewScreen state={gs} onBack={()=>setScreen('dashboard')} onPlay={goPlay} />}
+    {screen === 'profile' && <ProfileScreen state={gs} onBack={()=>setScreen('dashboard')} />}
+    {screen === 'settings' && <SettingsScreen state={gs} onBack={()=>setScreen('dashboard')} onSave={upd => { setGs(s=>({...s,...upd})); setScreen('dashboard'); }} />}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
